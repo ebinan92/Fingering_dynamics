@@ -7,42 +7,36 @@ from scipy import optimize as opt
 from scipy import interpolate
 from multiprocessing import Process
 import matplotlib.animation as animation
-
-from scipy import optimize
-from scipy.ndimage.filters import convolve
 import math
 import time
 
 H = 200  # lattice dimensions
 W = 300
-DELTA_T = 1.0 * 10 ** (-13)  # time step
-DELTA_X = 1.0 * 10 ** (-9)  # lattice spacing
-x_array = np.arange(1.0, 1.7, 0.01)*DELTA_T*100
-MAX_T = 15
+MAX_T = 5000
 psi_wall = 0.0
-sigma = 0.045  #  interfacial tension
-Pe = 5  # peclet number
-u0 = DELTA_X  # initial velocity
-rho = 10.0 ** 3
+Pe = 100 # peclet number
+rho = 1.0
 n_non = 1.0  # power-law parameter
 Eta_n = 0.023  # Eta newtonian
-M = 5.0  # Eta non_newtonian / Eta newtonian
+M = 10.0  # Eta non_newtonian / Eta newtonian
 Theta = np.pi / 4  # contact angle
-v1 = 10.0 ** (-6)  #self.mix kinetic viscosity of newtonian
+tau = 1 / (3 - np.sqrt(3))
+C_W = 1.0 * (10.0 ** (-5)) / W
+C_rho = 10.0 ** 3
+v1 = (tau - 0.5) / 3   # kinetic viscosity of newtonian
+C_t = v1 / (10.0 ** (-6)) * (C_W ** 2)
+DELTA_X = 1.0   # time step
+DELTA_T = 1.0  # lattice spacing
+sigma = 0.045 * (C_t ** 2) / (C_rho * (C_W ** 3))  # interfacial tension
+u0 = C_t / C_W  # initial velocity
 c = DELTA_X / DELTA_T  # particle streaming speed
-cs = c / np.sqrt(3.0)
+cs = c / np.sqrt(3)
 xi = 2.0 * DELTA_X
 kappa = (3 / 4) * sigma * xi
 a = 2 * kappa / (xi ** 2)
-tau = 1 / (3 - np.sqrt(3))
 gamma = u0 * W / (a * Pe) / ((tau - 0.5) * DELTA_T)
-x = sympy.symbols('x')
-#print(gamma)
-#gamma = 1.0 * 10.0 ** (-10)
-b = np.array([i for i in range(1,10)]).reshape(3,3)
-#print(np.roll(b, 1, axis=0))
-
-
+#x = sympy.symbols('x')
+#x_array = np.arange(1.0, 1.7, 0.01)*DELTA_T*100
 class Compute:
     def __init__(self):
         self.e = np.array([np.array([0.0, 0.0]) for i in range(9)])
@@ -68,6 +62,7 @@ class Compute:
             print(self.e[i], self.w[i])
         self.psi = np.full((H, W), -1.0).astype(float)
         circle = create_circle(W, 36).T
+        #self.psi[int(H/2 - 20):int(H/2 + 20), int(W/2 - 20):int(W/2 + 20)] = 1.0
         circl = circle[:H, :]
         #print(circl.shape)
         # circl[0, int(W/2)] = 0
@@ -87,54 +82,32 @@ class Compute:
         self.feq = np.array([np.zeros((H, W), dtype=float) for i in range(9)])
         self.geq = np.array([np.zeros((H, W), dtype=float) for i in range(9)])
         self.mu = self.getMu()
-        self.updateU()
         self.F = np.array([np.zeros((H, W), dtype=float) for i in range(9)])
         self.mix_tau = self.getMix_tau()
-        self.p = np.zeros((H, W), dtype=float)
+        self.p = self.getP()
         for i in range(9):
             if i == 0:
                 self.A0 = self.getA0()
-                #self.feq[i] = self.getfeq(i)
                 self.f[i] = self.getfeq(i)
                 self.B0 = self.getB0()
-                #self.geq[i] = self.getgeq(i)
                 self.g[i] = self.getgeq(i)
             elif i < 5:
                 self.A1_8 = self.getA1_8()
                 self.f[i] = self.getfeq(i)
-                #self.feq[i] = self.getfeq(i)
                 self.B1_8 = self.getB1_8()
-                #self.geq[i] = self.getgeq(i)
                 self.g[i] = self.getgeq(i)
             elif i >= 5:
                 self.f[i] = self.getfeq(i)
-                #self.feq[i] = self.getfeq(i)
-                #self.geq[i] = self.getgeq(i)
                 self.g[i] = self.getgeq(i)
 
-
-    # def updateP(self):
-    #     self.p = np.sum(self.f, axis=0) * (cs ** 2)
-    #     print("p:{}".format(self.p.mean()))
     def getP(self):
-        #p = kappa * self.getNabla_psiy()*self.getNabla_psix()
-        # p = 1/3 * self.rho + self.psi * self.mu
         p = (cs ** 2) * self.rho + self.psi * self.mu
-        #p0 = cs ** 2 * self.rho
-        #ss = a/2.0*self.psi**2 - 3.0/4.0*a*self.psi**4 - kappa*self.psi*self.getNabla_psi2()-kappa/2*(self.getNabla_psix()**2+self.getNabla_psiy()**2)
-        #return kappa * (self.getNabla_psiy() ** 2 + self.getNabla_psix() ** 2)
-        print("p:{}".format(p.mean()))
-        #p0 = p0 + ss
+        #print("p:{}".format(p.mean()))
         return p
 
     def updateP(self):
-        #self.p = 1/3 * self.rho + self.psi * self.mu
         self.p = (cs ** 2) * self.rho + self.psi * self.mu
-        #p0 = (cs ** 2) * self.rho
-        #self.p = kappa * self.getNabla_psiy()*self.getNabla_psix()
-        #ss = a/2.0*self.psi**2 - 3.0/4.0*a*self.psi**4 - kappa*self.psi*self.getNabla_psi2()-kappa/2*(self.getNabla_psix()**2+self.getNabla_psiy()**2)
-        #print("p:{},ss:{}".format(p0.mean(), ss.mean()))
-        print("p:{}".format(self.p.mean()))
+        #print("p:{}".format(self.p.mean()))
 
     def updateU(self):
         temp1 = np.zeros((H, W), dtype=float)
@@ -144,7 +117,7 @@ class Compute:
             temp2 += self.f[i] * self.e[i][1]
         self.ux = (temp1 + self.mu * self.getNabla_psix() * DELTA_T / 2)/self.rho
         self.uy = (temp2 + self.mu * self.getNabla_psiy() * DELTA_T / 2)/self.rho
-        print("ux:{}, uy:{}".format(self.ux.mean(), self.uy.mean()))
+        #print("ux:{}, uy:{}".format(self.ux.mean(), self.uy.mean()))
 
     def getMu(self):
         mu = a * self.psi * (self.psi ** 2 - 1) - kappa * self.getNabla_psi2()
@@ -153,11 +126,11 @@ class Compute:
 
     def updateMu(self):
         self.mu = a * self.psi * (self.psi ** 2 - 1) - kappa * self.getNabla_psi2()
-        print("mu:{}".format(self.mu.mean()))
+        #print("mu:{}".format(self.mu.mean()))
 
     def updateRho(self):
         self.rho = np.sum(self.f, axis=0)  # macroscopic density
-        print("rho:{}".format(self.rho.mean()))
+        #print("rho:{}".format(self.rho.mean()))
 
     def getA0(self):
         a0 = (self.rho - (1.0 - self.w[0]) * self.p / (cs ** 2)) / self.w[0]
@@ -186,7 +159,6 @@ class Compute:
             feq = self.w[n] * (self.getA1_8() + self.rho * (
                     3 * (self.e[n][0] * self.ux + self.e[n][1] * self.uy) / (c ** 2) + 4.5 * (
                     self.e[n][0] * self.ux + self.e[n][1] * self.uy) ** 2 / (c ** 4) - 1.5 * (self.ux ** 2 + self.uy ** 2) / (c ** 2)))
-        #print("ev2_x:{},ev2_y:{}".format((self.e[n][0]*self.ux).mean(),(self.e[n][1]*self.uy).mean()))
         return feq
 
     def getgeq(self, n):
@@ -198,7 +170,6 @@ class Compute:
             geq = self.w[n] * (self.getB1_8() + self.psi * (
                     3 * (self.e[n][0] * self.ux + self.e[n][1] * self.uy) / (c ** 2) + 4.5 * (
                     self.e[n][0] * self.ux + self.e[n][1] * self.uy) ** 2 / (c ** 4) - 1.5 * (self.ux ** 2 + self.uy ** 2) / (c ** 2)))
-        #print("geq{}:{}".format(n, geq.mean()))
         return geq
 
     def getLarge_F(self, n):
@@ -227,21 +198,21 @@ class Compute:
         mix_v = np.divide(2 * v1 * v2, (v2 * (1.0 - self.psi) + v1 * (1.0 + self.psi)))
         mix_tau = 3 * mix_v / (DELTA_T * c ** 2) + 0.5
         self.mix_tau = copy.deepcopy(mix_tau)
-        print("mix_tau:{}".format(mix_tau.mean()))
+        #print("mix_tau:{}".format(mix_tau.mean()))
 
-    def power_law(self, temp2):
-        #print(temp2)
-        y_array = x_array - temp2 * x_array ** (1 - n_non) - 0.5 * DELTA_T
-        tau2 = interpolate.interp1d(y_array.real, x_array, kind='nearest', fill_value='extrapolate')(0)
-        #tau2 = sympy.solve(x - temp2 * x ** (1 - n_non) - 0.5 * DELTA_T)[0]
-        #print(tau2)
-        return tau2
+    # def power_law(self, temp2):
+    #     #print(temp2)
+    #     y_array = x_array - temp2 * x_array ** (1 - n_non) - 0.5 * DELTA_T
+    #     tau2 = interpolate.interp1d(y_array.real, x_array, kind='nearest', fill_value='extrapolate')(0)
+    #     #tau2 = sympy.solve(x - temp2 * x ** (1 - n_non) - 0.5 * DELTA_T)[0]
+    #     #print(tau2)
+    #     return tau2
 
     def getMix_tau(self):
         v2 = v1 * M
         mix_v = np.divide(2 * v1 * v2, v2 * (1.0 - self.psi) + v1 * (1.0 + self.psi))
         mix_tau = 3 * mix_v / (c ** 2) + 0.5*DELTA_T
-        print("mix_tau:{}".format(mix_tau.mean()/DELTA_T))
+        #print("mix_tau:{}".format(mix_tau.mean()/DELTA_T))
         return mix_tau
 
     def updatePsi(self):
@@ -312,13 +283,8 @@ class Compute:
                 f += np.roll(np.roll(temp, 1, axis=1), 1, axis=0)[1:-1, :]
             elif i == 8:
                 f += np.roll(np.roll(temp, -1, axis=1), 1, axis=0)[1:-1, :]
-        print("psi_2:{}".format(f.mean() / ( 6 * DELTA_X ** 2) * kappa))
+        #print("psi_2:{}".format(f.mean() / ( 6 * DELTA_X ** 2) * kappa))
         return f / (6 * (DELTA_X ** 2))
-
-    # def getPsi_wall_list(self):
-    #     psi_wall = sympy.symbols('psi')
-    #     out = sympy.solve(1 / 2 * psi_wall ** 3 - 3 / 2 * psi_wall + np.cos(Theta))[0].as_real_imag()
-    #     return np.full((1, W), out[0]).astype(float)
 
     def updateF(self):
         for i in range(9):
@@ -337,10 +303,7 @@ def create_circle(n, r):
 
 def stream(f, g):
     for i in range(9):
-        #print("f[{}]:{}".format(i, f[i].mean()))
-        if i == 0:
-            continue
-        elif i == 1:
+        if i == 1:
             f[i] = np.roll(f[i], 1, axis=1)
             g[i] = np.roll(g[i], 1, axis=1)
         elif i == 2:
@@ -366,50 +329,23 @@ def stream(f, g):
             g[i] = np.roll(np.roll(g[i], 1, axis=1), -1, axis=0)
 
 def halfway_bounceback(f_behind, g_behind, f, g):
-
     for i in range(9):
-        if i == 0:
-            continue
-        elif i == 1:
-            f[i][0, :] = 0.0
-            g[i][0, :] = 0.0
-            f[i][-1, :] = 0.0
-            g[i][-1, :] = 0.0
-            continue
-        elif i == 2:
+        if i == 2:
             f[i][0, :] = f_behind[4][0, :]
             g[i][0, :] = g_behind[4][0, :]
-            f[i][-1, :] = 0
-            g[i][-1, :] = 0
-        elif i == 3:
-            f[i][0, :] = 0.0
-            g[i][0, :] = 0.0
-            f[i][-1, :] = 0.0
-            g[i][-1, :] = 0.0
-            continue
         elif i == 4:
-            f[i][0, :] = 0.0
-            g[i][0, :] = 0.0
             f[i][-1, :] = f_behind[2][-1, :]
             g[i][-1, :] = g_behind[2][-1, :]
         elif i == 5:
             f[i][0, :] = f_behind[7][0, :]
             g[i][0, :] = g_behind[7][0, :]
-            f[i][-1, :] = 0.0
-            g[i][-1, :] = 0.0
         elif i == 6:
             f[i][0, :] = f_behind[8][0, :]
             g[i][0, :] = g_behind[8][0, :]
-            f[i][-1, :] = 0.0
-            g[i][-1, :] = 0.0
         elif i == 7:
-            f[i][0, :] = 0.0
-            g[i][0, :] = 0.0
             f[i][-1, :] = f_behind[5][-1, :]
             g[i][-1, :] = g_behind[5][-1, :]
         elif i == 8:
-            f[i][0, :] = 0.0
-            g[i][0, :] = 0.0
             f[i][-1, :] = f_behind[6][-1, :]
             g[i][-1, :] = g_behind[6][-1, :]
 
@@ -444,11 +380,6 @@ def main():
             cm.geq[j] = cm.getgeq(j)
         cm.updateF()
         cm.updateG()
-        # print("large_F[0]:{}".format(cm.F[0].mean()))
-        # print("f[0]:{}".format(cm.f[0].mean()))
-        # print("g[0]:{}".format(cm.g[0].mean()))
-        # print("feq[0]:{}".format(cm.feq[0].mean()))
-        # print("geq[0]:{}".format(cm.geq[0].mean()))
         # if i % mabiki == 0:
         #     print("HI")
         #     cc = np.append(cc, np.array([cm.psi]), axis=0)
