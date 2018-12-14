@@ -14,12 +14,12 @@ M = 512  # number of transverse collocation points
 N = 128  # number of vertical collocation points
 DELTA_A = 1.0
 DELTA_B = 1.0
-DELTA_C = 0.05
+DELTA_C = 0.03
 R = 2.0  # viscosity ratio
 A = 2.0  # aspect ratio
-Pe = 50  # U(velocity)*N /D(dispersion)
+Pe = 70  # U(velocity)*N /D(dispersion)
 DELTA_T = 0.01
-MAX_T = 65
+MAX_T = 60
 FAI = 1.0
 alpha = 0
 
@@ -319,15 +319,15 @@ def main():
         cm_a.updateC(nexta)
         cm_b.updateC(nextb)
         cm_c.a = copy.deepcopy(nexta)
-        print("nexta:{}".format(nexta.max()))
-        print("nextb:{}".format(nextb.max()))
-        print("nextc:{}".format(nextc.max()))
+        #print("nexta:{}".format(nexta.max()))
+        #print("nextb:{}".format(nextb.max()))
+        #print("nextc:{}".format(nextc.max()))
         cm_c.b = copy.deepcopy(nextb)
         cm_b.a = copy.deepcopy(nexta)
         cm_a.b = copy.deepcopy(nextb)
 
         if int(t * 100) % 100 == 0:
-            cc = np.append(cc, np.array([nexta]), axis=0)
+            cc = np.append(cc, np.array([nextc]), axis=0)
         ja_hat_before = copy.deepcopy(ja_hat)
         jb_hat_before = copy.deepcopy(jb_hat)
         jc_hat_before = copy.deepcopy(jc_hat)
@@ -339,13 +339,13 @@ def main():
     fig = plt.figure()
     plt.colorbar(plt.pcolor(cm_c.x, cm_c.y, cc[0].real, vmax=1.0, vmin=0, cmap='jet'))
     ani = animation.FuncAnimation(fig, update, fargs=(cm_c.x, cm_c.y, cc), frames=int(len(cc)))
-    ani.save('./movies/phase3/R{}_Pe{}_MAX_T{}_A{}_B{}_C{}_alpha{}.mp4'.format(R, Pe, MAX_T, DELTA_A, DELTA_B, DELTA_C, alpha, fps=8))
+    ani.save('../movies/phase3/R{}_Pe{}_MAX_T{}_Da{}_C{}.mp4'.format(R, Pe, MAX_T, DELTA_A,DELTA_C, fps=40))
     # plt.subplot(2,1,2)
-    # plt.figure()
-    # plt.pcolor(cm_c.x, cm_c.y, cc[-1].real, label='R=' + str(R) + ',' + 'Pe=' + str(Pe) + ',' + 'DELTA_C=' + str(DELTA_C),cmap='jet')
-    # plt.colorbar()
-    # plt.legend()
-    # plt.savefig('./movies/phase3/MAXT:{}_ABC={},{},{}.png'.format(MAX_T,DELTA_A,DELTA_B,DELTA_C))
+    plt.figure()
+    plt.pcolor(cm_c.x, cm_c.y, cc[-1].real, label='R=' + str(R) + ',' + 'Pe=' + str(Pe) + ',' + 'DELTA_C=' + str(DELTA_C),cmap='jet')
+    plt.colorbar()
+    plt.legend()
+    plt.savefig('../movies/phase3/R{}_Pe{}_MAX_T{}_Da{}_C{}.png'.format(R, Pe, MAX_T, DELTA_A, DELTA_C))
     # plt.show()
     t2 = time.time()
     print(t2 - t1)
