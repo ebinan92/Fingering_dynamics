@@ -4,6 +4,7 @@ import sympy
 import matplotlib.pyplot as plt
 import copy
 import cv2
+import pickle
 import math
 from multiprocessing import Pool
 from scipy.ndimage.morphology import binary_fill_holes
@@ -16,19 +17,20 @@ import time
 # from pydrive.drive import GoogleDrive
 # from google.colab import auth
 # from oauth2client.client import GoogleCredentials
-
 # auth.authenticate_user()
 # gauth = GoogleAuth()
 # gauth.credentials = GoogleCredentials.get_application_default()
 # drive = GoogleDrive(gauth)
+mei = False
+mei_time = 48
 H = 380  # lattice dimensions
 W = 380
 MAX_T = 1000
 psi_wall = 0.0  # wettability on block and wall
-Pe = 300  # Peclet number
+Pe = 60 # Peclet number
 C_W = 2.0 * (10 ** (-5)) / W  # conversion width
 Ca = 7.33 * 10 ** (-3)  # Capillary number
-M = 40.0  # Eta non_newtonian / Eta newtonian
+M = 20.0  # Eta non_newtonian / Eta newtonian
 R_Nu = 10 ** (-6)  # physical kinematic viscosity of newtonian
 tau = 1 / (3.0 - math.sqrt(3))  # relaxation time
 rho0 = 1.0  # non-dimensional pressure
@@ -117,13 +119,24 @@ class Compute:
         self.nabla_psiy = self.getNabla_psiy()
         self.nabla_psi2 = self.getNabla_psi2()
         self.mu = self.getMu()
-        # self.uy = self.getUy()
+        self.uy = self.getUy()
+        self.ux = self.getUx()
         self.p = self.getP()
         self.mix_tau = self.getMix_tau()
-        for i in range(9):
-            self.f[i][self.mask] = self.getfeq(i)
-            self.g[i][self.mask] = self.getgeq(i)
-
+        if not mei:
+            for i in range(9):
+                self.f[i][self.mask] = self.getfeq(i)
+                self.g[i][self.mask] = self.getgeq(i)
+        # if not mei:
+        #     f = open('./f_list.txt', 'rb')
+        #     g = open('./g_list.txt', 'rb')
+        #     f_list = pickle.load(f)
+        #     g_list = pickle.load(g)
+        #     for i in range(9):
+        #         self.f[i][self.mask] = f_list[i]
+        #         self.g[i][self.mask] = g_list[i]
+        #         # self.f[i][self.mask] = self.getfeq(i)
+        #         #self.g[i][self.mask] = self.getgeq(i)
     def getP(self):
         return 1/3 * self.rho + self.psi[self.mask] * self.mu
 
@@ -147,7 +160,7 @@ class Compute:
 
     def getRho(self):
         return np.sum(self.f, axis=0)[self.mask]  # macroscopic density
-        # print("rho:{}".format(self.rho.mean()))
+        #print("rho:{}".format(self.rho.mean()))
 
     def getA0(self):
         a0 = (self.rho - 3.0 * (1.0 - self.w[0]) * self.p) / self.w[0]
@@ -529,7 +542,7 @@ def main():
     flag = True
     mabiki = MAX_T // 150
     while True:
-        if count * 20 > 360:
+        if count * 20 > 340:
             break
         if flag:
             rect_corner_list.append(((count * 20, 60), ((count+1) * 20, 80)))
@@ -553,21 +566,17 @@ def main():
     cm = Compute(mask)
     cc = np.array([cm.psi])
     for i in range(MAX_T):
-        f_behind = copy.deepcopy(cm.f)
-        g_behind = copy.deepcopy(cm.g)
-        stream(cm.f, cm.g)
-        halfway_bounceback(corner_list, f_behind, g_behind, cm.f, cm.g)
-        bottom_top_wall(f_behind[:, 1:-1], g_behind[:, 1:-1], cm.f[:, 1:-1], cm.g[:, 1:-1])
-        cm.zou_he_boundary_inlet()
-        cm.zou_he_boundary_outlet()
         cm.rho = cm.getRho()
+        print(cm.rho.mean())
         cm.udpatePsi()
         cm.nabla_psix = cm.getNabla_psix()
         cm.nabla_psiy = cm.getNabla_psiy()
         cm.nabla_psi2 = cm.getNabla_psi2()
         cm.mu = cm.getMu()
-        cm.ux = cm.getUx()
-        cm.uy = cm.getUy()
+        if not mei:
+            print("timestep:{}".format(i))
+            cm.ux = cm.getUx()
+            cm.uy = cm.getUy()
         cm.p = cm.getP()
         cm.mix_tau = cm.getMix_tau()
         for j in range(9):
@@ -576,21 +585,41 @@ def main():
             cm.geq[j] = cm.getgeq(j)
             cm.f[j][mask] = cm.getF(j)
             cm.g[j][mask] = cm.getG(j)
-        if i % mabiki == 0:
-            cc = np.append(cc, np.array([cm.psi]), axis=0)
-            print("timestep:{}".format(i))
-    y = [i for i in range(H)]
-    x = [i for i in range(W)]
-    # fig = plt.figure()
-    # plt.colorbar(plt.pcolor(x, y, cc[0], cmap='RdBu'))
-    # ani = animation.FuncAnimation(fig, update, fargs=(x, y, cc), frames=int(len(cc)))
-    # ani.save('MAX_T{}_Pe{}_M{}_Ca{}_wall{}.mp4'.format(MAX_T, Pe, M, Ca, psi_wall), fps=10)
-    plt.figure()
-    plt.pcolor(x, y, cm.psi, label='MAX_T{}_Pe{}_M{}_Ca{}_wall{}'.format(MAX_T, Pe, M, Ca, psi_wall),cmap='RdBu')
-    plt.colorbar()
-    plt.legend()
-    #plt.show()
-    plt.savefig('MAX_T{}_Pe{}_M{}_Ca{}_wall{}.png'.format(MAX_T, Pe, M, Ca, psi_wall))
+        #if i % mabiki == 0:
+            #cc = np.append(cc, np.array([cm.psi]), axis=0)
+            #print("timestep:{}".format(i))
+        f_behind = copy.deepcopy(cm.f)
+        g_behind = copy.deepcopy(cm.g)
+        stream(cm.f, cm.g)
+        halfway_bounceback(corner_list, f_behind, g_behind, cm.f, cm.g)
+        bottom_top_wall(f_behind[:, 1:-1], g_behind[:, 1:-1], cm.f[:, 1:-1], cm.g[:, 1:-1])
+        cm.zou_he_boundary_inlet()
+        cm.zou_he_boundary_outlet()
+
+        if mei and i == mei_time:
+            f = open('f_list.txt', 'wb')
+            g = open('g_list.txt', 'wb')
+            f_list = []
+            g_list = []
+            for j in range(9):
+                f_list.append(cm.f[j][mask])
+                g_list.append(cm.g[j][mask])
+            pickle.dump(f_list, f)
+            pickle.dump(g_list, g)
+            break
+    if not mei:
+        y = [i for i in range(H)]
+        x = [i for i in range(W)]
+        # fig = plt.figure()
+        # plt.colorbar(plt.pcolor(x, y, cc[0], cmap='RdBu'))
+        # ani = animation.FuncAnimation(fig, update, fargs=(x, y, cc), frames=int(len(cc[:50])))
+        # ani.save('MAX_T{}_Pe{}_M{}_Ca{}_wall{}.mp4'.format(MAX_T, Pe, M, Ca, psi_wall), fps=10)
+        plt.figure()
+        plt.pcolor(x, y, cm.psi, label="MAX_T:{}, Pe:{}, M:{}, psi_wall:{}".format(MAX_T, Pe, M, psi_wall),cmap='RdBu')
+        plt.colorbar()
+        plt.legend()
+        plt.show()
+        plt.savefig('MAX_T:{}, Pe:{}, M:{}, psi_wall:{}.png'.format(MAX_T, Pe, M, psi_wall))
 
 
 if __name__ == '__main__':
@@ -604,7 +633,7 @@ if __name__ == '__main__':
         # upload_file_2.SetContentFile('MAX_T{}_Pe{}_M{}_Ca{}_wall{}.mp4'.format(MAX_T, Pe, M, Ca, psi_wall))
         # upload_file_2.Upload()
         # upload_file_1 = drive.CreateFile()
-        # upload_file_1.SetContentFile('MAX_T:{}_Pe:{}_M:{}_Ca{}_psi_wall:{}.png'.format(MAX_T, Pe, M,Ca, psi_wall))
+        # upload_file_1.SetContentFile('MAX_T:{}, Pe:{}, M:{}, psi_wall:{}.png'.format(MAX_T, Pe, M, psi_wall))
         # upload_file_1.Upload()
     except Warning as e:
         print(e)
