@@ -1,34 +1,28 @@
-#!pip install -U -q PyDrive
 import numpy as np
 import sympy
 import matplotlib.pyplot as plt
 import copy
 import cv2
+from create_block import Createblock
+from bounce_back import Bounce_back
+# for server
+#plt.switch_backend('agg')
 import math
 from multiprocessing import Pool
 from scipy.ndimage.morphology import binary_fill_holes
 import matplotlib.animation as animation
-from scipy import optimize
-from scipy.ndimage.filters import convolve
+
 import math
 import time
-# from pydrive.auth import GoogleAuth
-# from pydrive.drive import GoogleDrive
-# from google.colab import auth
-# from oauth2client.client import GoogleCredentials
 
-# auth.authenticate_user()
-# gauth = GoogleAuth()
-# gauth.credentials = GoogleCredentials.get_application_default()
-# drive = GoogleDrive(gauth)
-H = 380  # lattice dimensions
-W = 380
-MAX_T = 1000
+H = 390  # lattice dimensions
+W = 390
+MAX_T = 30000
 psi_wall = 0.0  # wettability on block and wall
-Pe = 300  # Peclet number
+Pe = 50  # Peclet number
 C_W = 2.0 * (10 ** (-5)) / W  # conversion width
 Ca = 7.33 * 10 ** (-3)  # Capillary number
-M = 40.0  # Eta non_newtonian / Eta newtonian
+M = 20.0  # Eta non_newtonian / Eta newtonian
 R_Nu = 10 ** (-6)  # physical kinematic viscosity of newtonian
 tau = 1 / (3.0 - math.sqrt(3))  # relaxation time
 rho0 = 1.0  # non-dimensional pressure
@@ -38,15 +32,16 @@ R_sigma = 0.045  # physical interfacial tension
 C_rho = 1.0 * 10 ** 3  # conversion pressure
 v1 = (tau - 0.5) / 3  # non-dimensional kinematic viscosity of newtonian
 C_t = v1 / R_Nu * (C_W ** 2)  # conversion time step
-#x_array = np.arange(1.0, 1.7, 0.01)* 100
+# x_array = np.arange(1.0, 1.7, 0.01)* 100
 sigma = R_sigma * (C_t ** 2) / (C_rho * (C_W ** 3))  # interfacial tension
 u0 = Ca * sigma / (rho0 * v1)  # inlet velocity
 xi = 2.0  # interface thickness
 kappa = 0.75 * sigma * xi  # interfacial tension
 a = - 2.0 * kappa / (xi ** 2)
-gamma = u0 * W / (-a * Pe) / (tau - 0.5)
+gamma = u0 * W / ((-a * Pe) * (tau - 0.5))
 x = sympy.symbols('x')
 print("u0:{}".format(u0))
+
 
 class Compute:
     def __init__(self, mask):
@@ -98,7 +93,7 @@ class Compute:
         self.left_wall = np.full((H, 1), 1.0)
         self.right_wall = np.full((H, 1), -1.0)
         self.gamma = gamma
-        self.psi_wall_list = np.full((1, W + 2), psi_wall)
+        self.top_bottom_wall = np.full((1, W + 2), psi_wall)
         self.nabla_psix = np.zeros((H, W))[mask]
         self.nabla_psiy = np.zeros((H, W))[mask]
         self.nabla_psi2 = np.zeros((H, W))[mask]
@@ -125,7 +120,7 @@ class Compute:
             self.g[i][self.mask] = self.getgeq(i)
 
     def getP(self):
-        return 1/3 * self.rho + self.psi[self.mask] * self.mu
+        return 1 / 3 * self.rho + self.psi[self.mask] * self.mu
 
     def getUx(self):
         temp = np.zeros((H, W))[self.mask]
@@ -134,6 +129,7 @@ class Compute:
         ux = (temp + self.mu * self.nabla_psix / 2) / self.rho
         return ux
         # print("ux:{}, uy:{}".format(self.ux.mean(), self.uy.mean()))
+
     def getUy(self):
         temp = np.zeros((H, W))[self.mask]
         for i in range(9):
@@ -197,7 +193,7 @@ class Compute:
 
     def getMix_tau(self):
         v2 = v1 * M
-        mix_v = np.divide(2 * v1 * v2, (v2 * (1.0 - self.psi[self.mask]) + v1 * (1.0 + self.psi[self.mask])))
+        mix_v = np.divide(2 * v1 * v2, (v1 * (1.0 - self.psi[self.mask]) + v2 * (1.0 + self.psi[self.mask])))
         mix_tau = 3 * mix_v + 0.5
         return mix_tau
 
@@ -210,7 +206,7 @@ class Compute:
         psi_with_block = copy.deepcopy(self.psi)
         psi_with_block[self.block_mask] = psi_wall
         temp = np.hstack((self.left_wall, np.hstack((psi_with_block, self.right_wall))))
-        temp = np.vstack((self.psi_wall_list, np.vstack((temp, self.psi_wall_list))))
+        temp = np.vstack((self.top_bottom_wall, np.vstack((temp, self.top_bottom_wall))))
         for i in range(9):
             if i == 1:
                 f += 4 * np.roll(temp, -1, axis=1)[1:-1, 1:-1]
@@ -231,7 +227,7 @@ class Compute:
         psi_with_block = copy.deepcopy(self.psi)
         psi_with_block[self.block_mask] = psi_wall
         temp = np.hstack((self.left_wall, np.hstack((psi_with_block, self.right_wall))))
-        temp = np.vstack((self.psi_wall_list, np.vstack((temp, self.psi_wall_list))))
+        temp = np.vstack((self.top_bottom_wall, np.vstack((temp, self.top_bottom_wall))))
         for i in range(9):
             if i == 2:
                 f += 4 * np.roll(temp, -1, axis=0)[1:-1, 1:-1]
@@ -252,7 +248,7 @@ class Compute:
         psi_with_block = copy.deepcopy(self.psi)
         psi_with_block[self.block_mask] = psi_wall
         temp = np.hstack((self.left_wall, np.hstack((psi_with_block, self.right_wall))))
-        temp = np.vstack((self.psi_wall_list, np.vstack((temp, self.psi_wall_list))))
+        temp = np.vstack((self.top_bottom_wall, np.vstack((temp, self.top_bottom_wall))))
         for i in range(9):
             if i == 0:
                 f += -20 * temp[1:-1, 1:-1]
@@ -283,6 +279,7 @@ class Compute:
         return g
 
     """http://phelafel.technion.ac.il/~drorden/project/ZouHe.pdf"""
+
     def zou_he_boundary_inlet(self):
         ux = u0
         rho_inlet = 1 / (1 - ux) * (self.f[0][:, 0] + self.f[2][:, 0] + self.f[4][:, 0] + 2 * (
@@ -336,7 +333,6 @@ class Compute:
         self.g[7][-1, 0] = self.g[5][-1, 0]
 
     """Lattice Boltzmann method: fundamentals and engineering applications with computer codes"""
-
     def zou_he_boundary_outlet(self):
         ux = u0
         rho_outlet = 1 / (1 + ux) * (self.f[0][:, -1] + self.f[2][:, -1] + self.f[4][:, -1] + 2 * (
@@ -356,13 +352,6 @@ class Compute:
         self.g[2][0, -1] = self.g[4][0, -1]
         self.f[4][-1, -1] = self.f[2][-1, -1]
         self.g[4][-1, -1] = self.g[2][-1, -1]
-
-
-
-def create_circle(n, r):
-    y, x = np.ogrid[-int(H / 2): int(H / 2), -r: n - r]
-    mask = x ** 2 + y ** 2 <= r ** 2
-    return mask
 
 
 def stream(f, g):
@@ -393,25 +382,12 @@ def stream(f, g):
             f[i] = np.roll(np.roll(f[i], 1, axis=1), -1, axis=0)
             g[i] = np.roll(np.roll(g[i], 1, axis=1), -1, axis=0)
 
-
-class Createblock:
-    # ブロックの枠組みを指定　頂点で決める
-    def getRectangleBlock(self, bottom_left, top_right):
-        block = np.zeros((H, W)).astype(np.uint8)
-        cv2.rectangle(block, bottom_left, top_right, (1, 0, 0))
-        return block
-
-
-    def getCorner(self, block):
-        points = cv2.findNonZero(block)
-        x, y, w, h = cv2.boundingRect(points)
-        top_right = (x + w - 1, y + h - 1)
-        top_left = (x, y + h - 1)
-        bottom_right = (x + w - 1, y)
-        bottom_left = (x, y)
-        corner = {"top_left": top_left, 'bottom_left': bottom_left, 'top_right': top_right,
-                  'bottom_right': bottom_right}
-        return corner
+def update(i, x, y, cc):
+    print(i)
+    plt.cla()
+    plt.pcolor(x, y, cc[i], label='MAX_T{}_Pe{}_M{}_Ca{}_wall{}'.format(MAX_T, Pe, M, Ca, psi_wall), cmap='RdBu')
+    # plt.clim(0,1)
+    plt.legend()
 
 
 def bottom_top_wall(f_behind, g_behind, f, g):
@@ -435,128 +411,83 @@ def bottom_top_wall(f_behind, g_behind, f, g):
             f[i][-1, :] = f_behind[6][-1, :]
             g[i][-1, :] = g_behind[6][-1, :]
 
-"""https://www.math.nyu.edu/~billbao/report930.pdf"""
-# mid-grid halfway bounce back
-def halfway_bounceback(corner_list, f_behind, g_behind, f, g):
-    n_barrier = np.zeros((H, W), dtype=bool)
-    s_barrier = np.zeros((H, W), dtype=bool)
-    e_barrier = np.zeros((H, W), dtype=bool)
-    w_barrier = np.zeros((H, W), dtype=bool)
-    nw_corner = np.zeros((H, W), dtype=bool)
-    ne_corner = np.zeros((H, W), dtype=bool)
-    sw_corner = np.zeros((H, W), dtype=bool)
-    se_corner = np.zeros((H, W), dtype=bool)
-    for cor in corner_list:
-        #print(cor['top_left'], cor['top_right'], cor['bottom_right'], cor['bottom_left'])
-        n_barrier[cor['top_left'][1]+1, cor['top_left'][0] + 1:cor['top_right'][0]] = True
-        s_barrier[cor['bottom_left'][1]-1, cor['top_left'][0] + 1:cor['top_right'][0]] = True
-        w_barrier[cor['bottom_left'][1] + 1:cor['top_left'][1], cor['top_right'][0]+1] = True
-        e_barrier[cor['bottom_left'][1] + 1:cor['top_left'][1], cor['top_left'][0]-1] = True
-        nw_corner[cor['top_right'][1]+1, cor['top_right'][0]+1] = True
-        ne_corner[cor['top_left'][1]+1, cor['top_left'][0]-1] = True
-        sw_corner[cor['bottom_right'][1]-1, cor['bottom_right'][0]+1] = True
-        se_corner[cor['bottom_left'][1]-1, cor['bottom_left'][0]-1] = True
-        # print(cor['top_left'], cor['top_right'], cor['bottom_left'], cor['bottom_right'])
-
-    for i in range(9):
-        if i == 1:
-            f[i][w_barrier] = f_behind[3][w_barrier]
-            g[i][w_barrier] = g_behind[3][w_barrier]
-        elif i == 2:
-            f[i][n_barrier] = f_behind[4][n_barrier]
-            g[i][n_barrier] = g_behind[4][n_barrier]
-        elif i == 3:
-            f[i][e_barrier] = f_behind[1][e_barrier]
-            g[i][e_barrier] = g_behind[1][e_barrier]
-        elif i == 4:
-            f[i][s_barrier] = f_behind[2][s_barrier]
-            g[i][s_barrier] = g_behind[2][s_barrier]
-        elif i == 5:
-            f[i][nw_corner] = f_behind[7][nw_corner]
-            g[i][nw_corner] = g_behind[7][nw_corner]
-            f[i][n_barrier] = f_behind[7][n_barrier]
-            g[i][n_barrier] = g_behind[7][n_barrier]
-            f[i][w_barrier] = f_behind[7][w_barrier]
-            g[i][w_barrier] = g_behind[7][w_barrier]
-        elif i == 6:
-            f[i][ne_corner] = f_behind[8][ne_corner]
-            g[i][ne_corner] = g_behind[8][ne_corner]
-            f[i][n_barrier] = f_behind[8][n_barrier]
-            g[i][n_barrier] = g_behind[8][n_barrier]
-            f[i][e_barrier] = f_behind[8][e_barrier]
-            g[i][e_barrier] = g_behind[8][e_barrier]
-        elif i == 7:
-            f[i][se_corner] = f_behind[5][se_corner]
-            g[i][se_corner] = g_behind[5][se_corner]
-            f[i][s_barrier] = f_behind[5][s_barrier]
-            g[i][s_barrier] = g_behind[5][s_barrier]
-            f[i][e_barrier] = f_behind[5][e_barrier]
-            g[i][e_barrier] = g_behind[5][e_barrier]
-        elif i == 8:
-            f[i][sw_corner] = f_behind[6][sw_corner]
-            g[i][sw_corner] = g_behind[6][sw_corner]
-            f[i][s_barrier] = f_behind[6][s_barrier]
-            g[i][s_barrier] = g_behind[6][s_barrier]
-            f[i][w_barrier] = f_behind[6][w_barrier]
-            g[i][w_barrier] = g_behind[6][w_barrier]
-
-
-def setblock(rect_corner_list):
-    cr = Createblock()
-    corner_list = []
-    #0 or 1の配列　1がblockのあるところを示す
-    block_psi_all = np.zeros((H, W), dtype=int)
-    for rect in rect_corner_list:
-        block = cr.getRectangleBlock(rect[0], rect[1])
-        block_psi = binary_fill_holes(block).astype(int)
-        corner = cr.getCorner(block)
-        corner_list.append(corner)
-        #print(block_psi.shape)
-        block_psi_all = block_psi_all + block_psi
-    print(block_psi_all.max(), "max")
-    return block_psi_all, corner_list
-
-def update(i, x, y, cc):
-    print(i)
-    plt.cla()
-    plt.pcolor(x, y, cc[i], label='MAX_T{}_Pe{}_M{}_Ca{}_wall{}'.format(MAX_T, Pe, M, Ca, psi_wall), cmap='RdBu')
-    # plt.clim(0,1)
-    plt.legend()
-
 def main():
     rect_corner_list = []
-    count = 1
+    count = 2
     flag = True
     mabiki = MAX_T // 150
+    # for rectangle block
+    # while True:
+    #     if count * 20 > 360:
+    #         break
+    #     if flag:
+    #         rect_corner_list.append(((count * 20, 60), ((count + 1) * 20, 80)))
+    #         rect_corner_list.append(((count * 20, 140), ((count + 1) * 20, 160)))
+    #         rect_corner_list.append(((count * 20, 220), ((count + 1) * 20, 240)))
+    #         rect_corner_list.append(((count * 20, 300), ((count + 1) * 20, 320)))
+    #         flag = False
+    #         count += 2
+    #         continue
+    #     elif not flag:
+    #         rect_corner_list.append(((count * 20, 20), ((count + 1) * 20, 40)))
+    #         rect_corner_list.append(((count * 20, 100), ((count + 1) * 20, 120)))
+    #         rect_corner_list.append(((count * 20, 180), ((count + 1) * 20, 200)))
+    #         rect_corner_list.append(((count * 20, 260), ((count + 1) * 20, 280)))
+    #         rect_corner_list.append(((count * 20, 340), ((count + 1) * 20, 360)))
+    #         flag = True
+    #         count += 2
+    #block_psi_all, corner_list = setblock(rect_corner_list)
+    cr = Createblock(H, W)
+    bb = Bounce_back(H, W)
+    circle_list = [[(int(W/2 - W/3), int(H/2)), 30]]
+    circle_list = []
+    # circle_list.append(((int(W/2), int(H/2)), 30))
+    r = 13
+    xx = 78
+    # circle_list.append(((count * 2 * r, xx + r), r))
+    # circle_list.append(((count * 2 * r, 2 * xx + 3 * r), r))
+    # circle_list.append(((count * 2 * r, 3 * xx + 5 * r + 1),  r + 1))
+    #circle_list.append(((count * 2 * r, 3 * xx + 5 * r), r))
+
     while True:
-        if count * 20 > 360:
+        if count * 2 * r > 350:
             break
         if flag:
-            rect_corner_list.append(((count * 20, 60), ((count+1) * 20, 80)))
-            rect_corner_list.append(((count * 20, 140), ((count+1) * 20, 160)))
-            rect_corner_list.append(((count * 20, 220), ((count+1) * 20, 240)))
-            rect_corner_list.append(((count * 20, 300), ((count+1) * 20, 320)))
+            circle_list.append(((count * 2 * r, 3 * r), r + 5))
+            circle_list.append(((count * 2 * r, xx + 5 * r), r + 5))
+            circle_list.append(((count * 2 * r, 2 * xx + 7 * r), r + 5))
+            circle_list.append(((count * 2 * r, 3 * xx + 9 * r), r + 5))
+            print(3 * xx + 5 * r)
+            print(2 * xx + 3 * r)
             flag = False
             count += 2
             continue
         elif not flag:
-            rect_corner_list.append(((count * 20, 20), ((count+1) * 20, 40)))
-            rect_corner_list.append(((count * 20, 100), ((count+1) * 20, 120)))
-            rect_corner_list.append(((count * 20, 180), ((count+1) * 20, 200)))
-            rect_corner_list.append(((count * 20, 260), ((count+1) * 20, 280)))
-            rect_corner_list.append(((count * 20, 340), ((count+1) * 20, 360)))
+            circle_list.append(((count * 2 * r, xx + r), r + 5))
+            circle_list.append(((count * 2 * r, 2 * xx + 3 * r), r + 5))
+            circle_list.append(((count * 2 * r, 3 * xx + 5 * r), r + 5))
             flag = True
             count += 2
-    block_psi_all, corner_list = setblock(rect_corner_list)
+    block_psi_all, side_list, concave_list, convex_list = cr.setCirleblock(circle_list)
     block_mask = np.where(block_psi_all == 1, True, False)
     mask = np.logical_not(block_mask)
     cm = Compute(mask)
     cc = np.array([cm.psi])
     for i in range(MAX_T):
+        for j in range(9):
+            cm.F[j] = cm.getLarge_F(j)
+            cm.feq[j] = cm.getfeq(j)
+            cm.geq[j] = cm.getgeq(j)
+            cm.f[j][mask] = cm.getF(j)
+            cm.g[j][mask] = cm.getG(j)
+        if i % mabiki == 0:
+            cc = np.append(cc, np.array([cm.psi]), axis=0)
+            print("timestep:{}".format(i))
         f_behind = copy.deepcopy(cm.f)
         g_behind = copy.deepcopy(cm.g)
         stream(cm.f, cm.g)
-        halfway_bounceback(corner_list, f_behind, g_behind, cm.f, cm.g)
+        bb.halfway_bounceback_circle(side_list, concave_list, convex_list, f_behind, g_behind, cm.f, cm.g)
+        #halfway_bounceback(corner_list, f_behind, g_behind, cm.f, cm.g)
         bottom_top_wall(f_behind[:, 1:-1], g_behind[:, 1:-1], cm.f[:, 1:-1], cm.g[:, 1:-1])
         cm.zou_he_boundary_inlet()
         cm.zou_he_boundary_outlet()
@@ -570,27 +501,19 @@ def main():
         cm.uy = cm.getUy()
         cm.p = cm.getP()
         cm.mix_tau = cm.getMix_tau()
-        for j in range(9):
-            cm.F[j] = cm.getLarge_F(j)
-            cm.feq[j] = cm.getfeq(j)
-            cm.geq[j] = cm.getgeq(j)
-            cm.f[j][mask] = cm.getF(j)
-            cm.g[j][mask] = cm.getG(j)
-        if i % mabiki == 0:
-            cc = np.append(cc, np.array([cm.psi]), axis=0)
-            print("timestep:{}".format(i))
     y = [i for i in range(H)]
     x = [i for i in range(W)]
-    # fig = plt.figure()
-    # plt.colorbar(plt.pcolor(x, y, cc[0], cmap='RdBu'))
-    # ani = animation.FuncAnimation(fig, update, fargs=(x, y, cc), frames=int(len(cc)))
-    # ani.save('MAX_T{}_Pe{}_M{}_Ca{}_wall{}.mp4'.format(MAX_T, Pe, M, Ca, psi_wall), fps=10)
+    fig = plt.figure()
+    plt.colorbar(plt.pcolor(x, y, cc[0], cmap='RdBu'))
+    ani = animation.FuncAnimation(fig, update, fargs=(x, y, cc), frames=int(len(cc)))
+    ani.save('../movies/MAX_T{}_Pe{}_M{}_Ca{}_wall{}.mp4'.format(MAX_T, Pe, M, Ca, psi_wall), fps=10)
     plt.figure()
-    plt.pcolor(x, y, cm.psi, label='MAX_T{}_Pe{}_M{}_Ca{}_wall{}'.format(MAX_T, Pe, M, Ca, psi_wall),cmap='RdBu')
+    plt.pcolor(x, y, cm.psi, label='MAX_T{}_Pe{}_M{}_Ca{}_wall{}'.format(MAX_T, Pe, M, Ca, psi_wall), cmap='RdBu')
     plt.colorbar()
     plt.legend()
-    #plt.show()
-    plt.savefig('MAX_T{}_Pe{}_M{}_Ca{}_wall{}.png'.format(MAX_T, Pe, M, Ca, psi_wall))
+    #plt.grid()
+    plt.show()
+    plt.savefig('../images/MAX_T{}_Pe{}_M{}_Ca{}_wall{}.png'.format(MAX_T, Pe, M, Ca, psi_wall))
 
 
 if __name__ == '__main__':
@@ -600,6 +523,17 @@ if __name__ == '__main__':
         main()
         t2 = time.time()
         print((t2 - t1) / 60)
+        # H = 30
+        # W = 30
+        # cr = Createblock()
+        # setCirleblock([[(15, 15), 10]])
+        # y = [i for i in range(H)]
+        # x = [i for i in range(W)]
+        # block = cr.getCicleblock((15, 15), 10)
+        # plt.figure()
+        # plt.pcolor(x, y, block)
+        # plt.grid()
+        # plt.show()
         # upload_file_2 = drive.CreateFile()
         # upload_file_2.SetContentFile('MAX_T{}_Pe{}_M{}_Ca{}_wall{}.mp4'.format(MAX_T, Pe, M, Ca, psi_wall))
         # upload_file_2.Upload()

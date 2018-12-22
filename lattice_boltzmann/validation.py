@@ -10,9 +10,9 @@ import matplotlib.animation as animation
 import math
 import time
 
-H = 200  # lattice dimensions
-W = 300
-MAX_T = 5000
+H = 100  # lattice dimensions
+W = 100
+MAX_T = 0
 psi_wall = 0.0
 Pe = 100 # peclet number
 rho = 1.0
@@ -61,7 +61,7 @@ class Compute:
 
             print(self.e[i], self.w[i])
         self.psi = np.full((H, W), -1.0).astype(float)
-        circle = create_circle(W, 36).T
+        circle = create_circle(W, 49).T
         #self.psi[int(H/2 - 20):int(H/2 + 20), int(W/2 - 20):int(W/2 + 20)] = 1.0
         circl = circle[:H, :]
         #print(circl.shape)
