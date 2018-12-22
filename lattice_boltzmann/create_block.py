@@ -88,8 +88,8 @@ class Createblock:
                     flag_left = block[y + i, x - 1 + j]
                     flag_left_bottom = block[y + i - 1, x - 1 + j]
 
-                    if (x + j) > 390 or (y + i) > 390:
-                        print(x + j, y + i)
+                    #if (x + j) > 390 or (y + i) > 390:
+                        #print(x + j, y + i)
                     if flag_left and flag_bottom:
                         concave_top_right_temp.append((x + j, y + i))
                         #print("concave:{}".format((x + j, y + i)))
@@ -98,7 +98,7 @@ class Createblock:
                         #print("side_left:{}".format((x + j, y + i)))
                     elif not flag_left and flag_bottom:
                         side_top_temp.append((x + j, y + i))
-                        print(x + j, y + i)
+                        #print(x + j, y + i)
                         #print("side_top:{}".format((x + j, y + i)))
                     elif flag_left_bottom:
                         convex_top_right_temp.append((x + j, y + i))
@@ -223,5 +223,5 @@ class Createblock:
             corner_list.append(corner)
             # print(block_psi.shape)
             block_psi_all = block_psi_all + block_psi
-        print(block_psi_all.max(), "max")
+        #print(block_psi_all.max(), "max")
         return block_psi_all, corner_list

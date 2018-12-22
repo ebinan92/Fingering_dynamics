@@ -17,10 +17,10 @@ import time
 
 H = 390  # lattice dimensions
 W = 390
-MAX_T = 30000
+MAX_T = 1000
 psi_wall = 0.0  # wettability on block and wall
-Pe = 50  # Peclet number
-C_W = 2.0 * (10 ** (-5)) / W  # conversion width
+Pe = 120  # Peclet number
+C_W = 5.0 * (10 ** (-5)) / W  # conversion width
 Ca = 7.33 * 10 ** (-3)  # Capillary number
 M = 20.0  # Eta non_newtonian / Eta newtonian
 R_Nu = 10 ** (-6)  # physical kinematic viscosity of newtonian
@@ -94,9 +94,9 @@ class Compute:
         self.right_wall = np.full((H, 1), -1.0)
         self.gamma = gamma
         self.top_bottom_wall = np.full((1, W + 2), psi_wall)
-        self.nabla_psix = np.zeros((H, W))[mask]
-        self.nabla_psiy = np.zeros((H, W))[mask]
-        self.nabla_psi2 = np.zeros((H, W))[mask]
+        self.nabla_psix = np.zeros((H, W))
+        self.nabla_psiy = np.zeros((H, W))
+        self.nabla_psi2 = np.zeros((H, W))
         self.rho = np.ones((H, W))[mask] * rho0  # macroscopic density
         self.ux = np.zeros((H, W))[mask]
         self.uy = np.zeros((H, W))[mask]
@@ -111,7 +111,7 @@ class Compute:
         self.nabla_psix = self.getNabla_psix()
         self.nabla_psiy = self.getNabla_psiy()
         self.nabla_psi2 = self.getNabla_psi2()
-        self.mu = self.getMu()
+        mu = self.getMu()
         # self.uy = self.getUy()
         self.p = self.getP()
         self.mix_tau = self.getMix_tau()
@@ -126,7 +126,7 @@ class Compute:
         temp = np.zeros((H, W))[self.mask]
         for i in range(9):
             temp += self.f[i][self.mask] * self.e[i][0]
-        ux = (temp + self.mu * self.nabla_psix / 2) / self.rho
+        ux = (temp + self.mu * self.nabla_psix[self.mask] / 2) / self.rho
         return ux
         # print("ux:{}, uy:{}".format(self.ux.mean(), self.uy.mean()))
 
@@ -134,11 +134,15 @@ class Compute:
         temp = np.zeros((H, W))[self.mask]
         for i in range(9):
             temp += self.f[i][self.mask] * self.e[i][1]
-        uy = (temp + self.mu * self.nabla_psiy / 2) / self.rho
+        uy = (temp + self.mu * self.nabla_psiy[self.mask] / 2) / self.rho
         return uy
 
     def getMu(self):
-        mu = a * self.psi[self.mask] * (1.0 - np.power(self.psi[self.mask], 2)) - kappa * self.nabla_psi2
+        mu = a * self.psi[self.mask] * (1.0 - np.power(self.psi[self.mask], 2)) - kappa * self.nabla_psi2[self.mask]
+        return mu
+
+    def getMu_plain(self):
+        mu = a * self.psi * (1.0 - np.power(self.psi, 2)) - kappa * self.nabla_psi2
         return mu
 
     def getRho(self):
@@ -187,8 +191,8 @@ class Compute:
     def getLarge_F(self, n):
         f = self.mu * self.w[n] * (1 - 1 / (2 * self.mix_tau)) \
             * (((self.e[n][0] - self.ux) * 3 + self.e[n][0] * (self.e[n][0] * self.ux + self.e[n][1] * self.uy) * 9)
-               * self.nabla_psix + ((self.e[n][1] - self.uy) * 3 + self.e[n][1] * (
-                        self.e[n][0] * self.ux + self.e[n][1] * self.uy) * 9) * self.nabla_psiy)
+               * self.nabla_psix[self.mask] + ((self.e[n][1] - self.uy) * 3 + self.e[n][1] * (
+                        self.e[n][0] * self.ux + self.e[n][1] * self.uy) * 9) * self.nabla_psiy[self.mask])
         return f
 
     def getMix_tau(self):
@@ -220,7 +224,7 @@ class Compute:
                 f += - np.roll(np.roll(temp, 1, axis=1), 1, axis=0)[1:-1, 1:-1]
             elif i == 8:
                 f += np.roll(np.roll(temp, -1, axis=1), 1, axis=0)[1:-1, 1:-1]
-        return f[self.mask] / 12
+        return f / 12
 
     def getNabla_psiy(self):
         f = np.zeros((H, W))
@@ -241,7 +245,7 @@ class Compute:
                 f += - np.roll(np.roll(temp, 1, axis=1), 1, axis=0)[1:-1, 1:-1]
             elif i == 8:
                 f += - np.roll(np.roll(temp, -1, axis=1), 1, axis=0)[1:-1, 1:-1]
-        return f[self.mask] / 12
+        return f / 12
 
     def getNabla_psi2(self):
         f = np.zeros((H, W))
@@ -268,7 +272,7 @@ class Compute:
                 f += np.roll(np.roll(temp, 1, axis=1), 1, axis=0)[1:-1, 1:-1]
             elif i == 8:
                 f += np.roll(np.roll(temp, -1, axis=1), 1, axis=0)[1:-1, 1:-1]
-        return f[self.mask] / 6
+        return f / 6
 
     def getF(self, i):
         f = self.f[i][self.mask] - 1.0 / self.mix_tau * (self.f[i][self.mask] - self.feq[i]) + self.F[i]
@@ -282,22 +286,25 @@ class Compute:
 
     def zou_he_boundary_inlet(self):
         ux = u0
+        psi_x = self.getNabla_psix()
+        psi_y = self.getNabla_psiy()
+        mu = self.getMu_plain()
         rho_inlet = 1 / (1 - ux) * (self.f[0][:, 0] + self.f[2][:, 0] + self.f[4][:, 0] + 2 * (
-                self.f[3][:, 0] + self.f[6][:, 0] + self.f[7][:, 0]))
+                self.f[3][:, 0] + self.f[6][:, 0] + self.f[7][:, 0]) - psi_x[:, 0] * mu[:, 0] / 2)
         psi_in = 1.0 - (
                 self.g[0][:, 0] + self.g[2][:, 0] + self.g[3][:, 0] + self.g[4][:, 0] + self.g[6][:, 0] + self.g[7][
                                                                                                           :, 0])
         for i in range(9):
             if i == 1:
-                self.f[i][1:-1, 0] = self.f[3][1:-1, 0] + 1.5 * ux * rho_inlet[1:-1]
+                self.f[i][1:-1, 0] = self.f[3][1:-1, 0] + 1.5 * ux * rho_inlet[1:-1] - psi_x[1:-1, 0] * mu[1:-1, 0] / 6
                 self.g[i][1:-1, 0] = self.w[i] * psi_in[1:-1] / (self.w[1] + self.w[5] + self.w[8])
             if i == 5:
                 self.f[i][1:-1, 0] = self.f[7][1:-1, 0] - 0.5 * (
-                        self.f[2][1:-1, 0] - self.f[4][1:-1, 0]) + 1.0 / 6.0 * ux * rho_inlet[1:-1]
+                        self.f[2][1:-1, 0] - self.f[4][1:-1, 0]) + 1.0 / 6.0 * ux * rho_inlet[1:-1] - psi_x[1:-1, 0] * mu[1:-1, 0] / 6 - psi_y[1:-1, 0] * mu[1:-1, 0] / 4
                 self.g[i][1:-1, 0] = self.w[i] * psi_in[1:-1] / (self.w[1] + self.w[5] + self.w[8])
             if i == 8:
                 self.f[i][1:-1, 0] = self.f[6][1:-1, 0] + 0.5 * (
-                        self.f[2][1:-1, 0] - self.f[4][1:-1, 0]) + 1.0 / 6.0 * ux * rho_inlet[1:-1]
+                        self.f[2][1:-1, 0] - self.f[4][1:-1, 0]) + 1.0 / 6.0 * ux * rho_inlet[1:-1] - psi_x[1:-1, 0] * mu[1:-1, 0] / 6 + psi_y[1:-1, 0] * mu[1:-1, 0] / 4
                 self.g[i][1:-1, 0] = self.w[i] * psi_in[1:-1] / (self.w[1] + self.w[5] + self.w[8])
 
         # left bottom corner node
@@ -333,19 +340,23 @@ class Compute:
         self.g[7][-1, 0] = self.g[5][-1, 0]
 
     """Lattice Boltzmann method: fundamentals and engineering applications with computer codes"""
+    # open_boundary_with_force
     def zou_he_boundary_outlet(self):
         ux = u0
+        psi_x = self.getNabla_psix()[:, -1]
+        psi_y = self.getNabla_psiy()[:, -1]
+        mu = self.getMu_plain()[:, -1]
         rho_outlet = 1 / (1 + ux) * (self.f[0][:, -1] + self.f[2][:, -1] + self.f[4][:, -1] + 2 * (
-                self.f[1][:, -1] + self.f[5][:, -1] + self.f[8][:, -1]))
+                self.f[1][:, -1] + self.f[5][:, -1] + self.f[8][:, -1]) + psi_x * mu / 2)
         psi_out = -1.0 - (self.g[0][:, -1] + self.g[1][:, -1] + self.g[2][:, -1] + self.g[4][:, -1] + self.g[5][:, -1] +
                           self.g[8][:, -1])
-        self.f[3][:, -1] = self.f[1][:, -1] - 1.5 * ux * rho_outlet
+        self.f[3][:, -1] = self.f[1][:, -1] - 1.5 * ux * rho_outlet + psi_x * mu / 6
         self.g[3][:, -1] = self.w[3] * psi_out / (self.w[3] + self.w[6] + self.w[7])
         self.f[6][:, -1] = self.f[8][:, -1] - 0.5 * (
-                self.f[2][:, -1] - self.f[4][:, -1]) - 1.0 / 6.0 * ux * rho_outlet
+                self.f[2][:, -1] - self.f[4][:, -1]) - 1.0 / 6.0 * ux * rho_outlet + psi_y * mu / 4 + psi_x * mu / 6
         self.g[6][:, -1] = self.w[6] * psi_out / (self.w[3] + self.w[6] + self.w[7])
         self.f[7][:, -1] = self.f[5][:, -1] + 0.5 * (
-                self.f[2][:, -1] - self.f[4][:, -1]) - 1.0 / 6.0 * ux * rho_outlet
+                self.f[2][:, -1] - self.f[4][:, -1]) - 1.0 / 6.0 * ux * rho_outlet - psi_y * mu / 4 + psi_x * mu / 6
         self.g[7][:, -1] = self.w[7] * psi_out / (self.w[3] + self.w[6] + self.w[7])
 
         self.f[2][0, -1] = self.f[4][0, -1]
