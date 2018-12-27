@@ -24,4 +24,4 @@ two phase lattice boltzmann with zou-he boundary and half way bounce-back
 
 ./spectrum_method/main_3phase.py
 
-![](3phase_precipitationVF.git)
+![](3phase_precipitationVF.gif)
