@@ -20,7 +20,7 @@ two phase lattice boltzmann with zou-he boundary and half way bounce-back
 
 ./lattice_boltzmann/validation.py
 
-![](wettability_validaton.png)
+![](wettability_validation.png)
 
 ./spectrum_method/main_3phase.py
 
