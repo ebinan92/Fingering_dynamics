@@ -6,7 +6,7 @@ import cv2
 from create_block import Createblock
 from bounce_back import Bounce_back
 # for server
-#plt.switch_backend('agg')
+# plt.switch_backend('agg')
 import math
 from multiprocessing import Pool
 from scipy.ndimage.morphology import binary_fill_holes
@@ -31,7 +31,7 @@ R_sigma = 0.045  # physical interfacial tension
 C_rho = 1.0 * 10 ** 3  # conversion pressure
 v0 = (tau - 0.5) / 3  # non-dimensional kinematic viscosity of newtonian
 C_t = v0 / R_Nu * (C_W ** 2)  # conversion time step
-Eta_n = 0.001 /(C_rho * (C_W ** 2) / C_t)  # non_dimentional Eta newtonian　
+Eta_n = 0.001 / (C_rho * (C_W ** 2) / C_t)  # non_dimentional Eta newtonian　
 # x_array = np.arange(1.0, 1.7, 0.01)* 100
 sigma = R_sigma * (C_t ** 2) / (C_rho * (C_W ** 3))  # interfacial tension
 u0 = Ca * sigma / (rho0 * v0)  # inlet velocity
@@ -215,7 +215,7 @@ class Compute:
         psi_with_block = copy.deepcopy(self.psi)
         psi_with_block[self.block_mask] = psi_wall
         temp = np.hstack((self.left_wall, np.hstack((psi_with_block, self.right_wall))))
-        #temp = np.vstack((self.top_bottom_wall, np.vstack((temp, self.top_bottom_wall))))
+        # temp = np.vstack((self.top_bottom_wall, np.vstack((temp, self.top_bottom_wall))))
         for i in range(9):
             if i == 1:
                 f += 4 * np.roll(temp, -1, axis=1)[:, 1:-1]
@@ -236,7 +236,7 @@ class Compute:
         psi_with_block = copy.deepcopy(self.psi)
         psi_with_block[self.block_mask] = psi_wall
         temp = np.hstack((self.left_wall, np.hstack((psi_with_block, self.right_wall))))
-        #temp = np.vstack((self.top_bottom_wall, np.vstack((temp, self.top_bottom_wall))))
+        # temp = np.vstack((self.top_bottom_wall, np.vstack((temp, self.top_bottom_wall))))
         for i in range(9):
             if i == 2:
                 f += 4 * np.roll(temp, -1, axis=0)[:, 1:-1]
@@ -257,7 +257,7 @@ class Compute:
         psi_with_block = copy.deepcopy(self.psi)
         psi_with_block[self.block_mask] = psi_wall
         temp = np.hstack((self.left_wall, np.hstack((psi_with_block, self.right_wall))))
-        #temp = np.vstack((self.top_bottom_wall, np.vstack((temp, self.top_bottom_wall))))
+        # temp = np.vstack((self.top_bottom_wall, np.vstack((temp, self.top_bottom_wall))))
         for i in range(9):
             if i == 0:
                 f += -20 * temp[:, 1:-1]
@@ -305,11 +305,21 @@ class Compute:
                 self.g[i][:, 0] = self.w[i] * psi_in[:] / (self.w[1] + self.w[5] + self.w[8])
             if i == 5:
                 self.f[i][:, 0] = self.f[7][:, 0] - 0.5 * (
-                        self.f[2][:, 0] - self.f[4][:, 0]) + 1.0 / 6.0 * ux * rho_inlet[:] - psi_x[:, 0] * mu[:, 0] / 6 - psi_y[:, 0] * mu[:, 0] / 4
+                        self.f[2][:, 0] - self.f[4][:, 0]) + 1.0 / 6.0 * ux * rho_inlet[:] - psi_x[:, 0] * mu[:,
+                                                                                                           0] / 6 - psi_y[
+                                                                                                                    :,
+                                                                                                                    0] * mu[
+                                                                                                                         :,
+                                                                                                                         0] / 4
                 self.g[i][:, 0] = self.w[i] * psi_in[:] / (self.w[1] + self.w[5] + self.w[8])
             if i == 8:
                 self.f[i][:, 0] = self.f[6][:, 0] + 0.5 * (
-                        self.f[2][:, 0] - self.f[4][:, 0]) + 1.0 / 6.0 * ux * rho_inlet[:] - psi_x[:, 0] * mu[:, 0] / 6 + psi_y[:, 0] * mu[:, 0] / 4
+                        self.f[2][:, 0] - self.f[4][:, 0]) + 1.0 / 6.0 * ux * rho_inlet[:] - psi_x[:, 0] * mu[:,
+                                                                                                           0] / 6 + psi_y[
+                                                                                                                    :,
+                                                                                                                    0] * mu[
+                                                                                                                         :,
+                                                                                                                         0] / 4
                 self.g[i][:, 0] = self.w[i] * psi_in[:] / (self.w[1] + self.w[5] + self.w[8])
 
         # # left bottom corner node
@@ -345,6 +355,7 @@ class Compute:
         # self.g[7][-1, 0] = self.g[5][-1, 0]
 
     """Lattice Boltzmann method: fundamentals and engineering applications with computer codes"""
+
     # open_boundary_with_force
     def zou_he_boundary_outlet(self):
         ux = u0
@@ -398,6 +409,7 @@ def stream(f, g):
             f[i] = np.roll(np.roll(f[i], 1, axis=1), -1, axis=0)
             g[i] = np.roll(np.roll(g[i], 1, axis=1), -1, axis=0)
 
+
 def update(i, x, y, cc):
     print(i)
     plt.cla()
@@ -427,6 +439,7 @@ def bottom_top_wall(f_behind, g_behind, f, g):
             f[i][-1, :] = f_behind[6][-1, :]
             g[i][-1, :] = g_behind[6][-1, :]
 
+
 def main():
     rect_corner_list = []
 
@@ -450,10 +463,10 @@ def main():
     #         rect_corner_list.append(((count * 20, 340), ((count + 1) * 20, 360)))
     #         flag = True
     #         count += 2
-    #block_psi_all, corner_list = setblock(rect_corner_list)
+    # block_psi_all, corner_list = setblock(rect_corner_list)
     cr = Createblock(H, W)
     bb = Bounce_back(H, W)
-    circle_list = [[(int(W/2 - W/3), int(H/2)), 30]]
+    circle_list = [[(int(W / 2 - W / 3), int(H / 2)), 30]]
     circle_list = []
     # circle_list.append(((int(W/2), int(H/2)), 30))
     r = 20
@@ -461,7 +474,7 @@ def main():
     # circle_list.append(((count * 2 * r, xx + r), r))
     # circle_list.append(((count * 2 * r, 2 * xx + 3 * r), r))
     # circle_list.append(((count * 2 * r, 3 * xx + 5 * r + 1),  r + 1))
-    #circle_list.append(((count * 2 * r, 3 * xx + 5 * r), r))
+    # circle_list.append(((count * 2 * r, 3 * xx + 5 * r), r))
 
     # while True:
     #     if count * 2 * r > 350:
@@ -497,7 +510,6 @@ def main():
         circle_list.append(((count * r, 18 * r), r))
         count += 4
 
-
     block_psi_all, side_list, concave_list, convex_list = cr.setCirleblock(circle_list)
     block_mask = np.where(block_psi_all == 1, True, False)
     mask = np.logical_not(block_mask)
@@ -517,8 +529,8 @@ def main():
         g_behind = copy.deepcopy(cm.g)
         stream(cm.f, cm.g)
         bb.halfway_bounceback_circle(side_list, concave_list, convex_list, f_behind, g_behind, cm.f, cm.g)
-        #halfway_bounceback(corner_list, f_behind, g_behind, cm.f, cm.g)
-        #bottom_top_wall(f_behind[:, 1:-1], g_behind[:, 1:-1], cm.f[:, 1:-1], cm.g[:, 1:-1])
+        # halfway_bounceback(corner_list, f_behind, g_behind, cm.f, cm.g)
+        # bottom_top_wall(f_behind[:, 1:-1], g_behind[:, 1:-1], cm.f[:, 1:-1], cm.g[:, 1:-1])
         cm.zou_he_boundary_inlet()
         cm.zou_he_boundary_outlet()
         cm.rho = cm.getRho()
@@ -541,7 +553,7 @@ def main():
     plt.pcolor(x, y, cm.psi, label='MAX_T{}_Pe{}_M{}_Ca{}_wall{}'.format(MAX_T, Pe, M, Ca, psi_wall), cmap='RdBu')
     plt.colorbar()
     plt.legend()
-    #plt.grid()
+    # plt.grid()
     plt.show()
     # plt.savefig('../images/MAX_T{}_Pe{}_M{}_Ca{}_wall{}.png'.format(MAX_T, Pe, M, Ca, psi_wall))
 

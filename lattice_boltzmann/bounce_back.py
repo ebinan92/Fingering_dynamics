@@ -5,7 +5,9 @@ class Bounce_back:
     def __init__(self, H, W):
         self.H = H
         self.W = W
+
     """https://www.math.nyu.edu/~billbao/report930.pdf"""
+
     # mid-grid halfway bounce back
     def halfway_bounceback_rec(self, corner_list, f_behind, g_behind, f, g):
         self.H = f[0].shape[0]
@@ -19,7 +21,6 @@ class Bounce_back:
         sw_corner = np.zeros((self.H, self.W), dtype=bool)
         se_corner = np.zeros((self.H, self.W), dtype=bool)
         for cor in corner_list:
-
             # print(cor['top_left'], cor['top_right'], cor['bottom_right'], cor['bottom_left'])
             n_barrier[cor['top_left'][1] + 1, cor['top_left'][0] + 1:cor['top_right'][0]] = True
             s_barrier[cor['bottom_left'][1] - 1, cor['top_left'][0] + 1:cor['top_right'][0]] = True
