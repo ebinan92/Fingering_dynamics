@@ -6,7 +6,7 @@ import cv2
 from create_block import Createblock
 from bounce_back import Bounce_back
 # for server
-#plt.switch_backend('agg')
+# plt.switch_backend('agg')
 import math
 from multiprocessing import Pool
 from scipy.ndimage.morphology import binary_fill_holes
@@ -15,23 +15,23 @@ import matplotlib.animation as animation
 import math
 import time
 
-H = 390  # lattice dimensions
-W = 390
-MAX_T = 1000
-psi_wall = 0.0  # wettability on block and wall
-Pe = 120  # Peclet number
-C_W = 5.0 * (10 ** (-5)) / W  # conversion width
+H = 400  # lattice dimensions
+W = 420
+MAX_T = 200
+psi_wall = -1.0  # wettability on block and wall
+Pe = 300  # Peclet number
+C_W = 6.0 * (10 ** (-5)) / W  # conversion width
 Ca = 7.33 * 10 ** (-3)  # Capillary number
 M = 20.0  # Eta non_newtonian / Eta newtonian
 R_Nu = 10 ** (-6)  # physical kinematic viscosity of newtonian
 tau = 1 / (3.0 - math.sqrt(3))  # relaxation time
 rho0 = 1.0  # non-dimensional pressure
 n_non = 1.0  # rho0 power-law parameter
-Eta_n = 0.023  # Eta newtonian
 R_sigma = 0.045  # physical interfacial tension
 C_rho = 1.0 * 10 ** 3  # conversion pressure
 v1 = (tau - 0.5) / 3  # non-dimensional kinematic viscosity of newtonian
 C_t = v1 / R_Nu * (C_W ** 2)  # conversion time step
+Eta_n = 0.001 / (C_rho * (C_W ** 2) / C_t)  # non_dimentional Eta newtonian　
 # x_array = np.arange(1.0, 1.7, 0.01)* 100
 sigma = R_sigma * (C_t ** 2) / (C_rho * (C_W ** 3))  # interfacial tension
 u0 = Ca * sigma / (rho0 * v1)  # inlet velocity
@@ -138,11 +138,13 @@ class Compute:
         return uy
 
     def getMu(self):
-        mu = a * self.psi[self.mask] * (1.0 - np.power(self.psi[self.mask], 2)) - kappa * self.nabla_psi2[self.mask]
+        ones = np.ones((H, W))[self.mask]
+        mu = a * self.psi[self.mask] * (ones - np.power(self.psi[self.mask], 2)) - kappa * self.nabla_psi2[self.mask]
         return mu
 
     def getMu_plain(self):
-        mu = a * self.psi * (1.0 - np.power(self.psi, 2)) - kappa * self.nabla_psi2
+        ones = np.ones((H, W))
+        mu = a * self.psi * (ones - np.power(self.psi, 2)) - kappa * self.nabla_psi2
         return mu
 
     def getRho(self):
@@ -196,8 +198,10 @@ class Compute:
         return f
 
     def getMix_tau(self):
-        v2 = v1 * M
-        mix_v = np.divide(2 * v1 * v2, (v1 * (1.0 - self.psi[self.mask]) + v2 * (1.0 + self.psi[self.mask])))
+        ones = np.ones((H, W))[self.mask]
+        v11 = Eta_n / self.rho
+        v2 = Eta_n * M / self.rho
+        mix_v = np.divide(2 * v11 * v2, (v11 * (ones - self.psi[self.mask]) + v2 * (ones + self.psi[self.mask])))
         mix_tau = 3 * mix_v + 0.5
         return mix_tau
 
@@ -300,11 +304,23 @@ class Compute:
                 self.g[i][1:-1, 0] = self.w[i] * psi_in[1:-1] / (self.w[1] + self.w[5] + self.w[8])
             if i == 5:
                 self.f[i][1:-1, 0] = self.f[7][1:-1, 0] - 0.5 * (
-                        self.f[2][1:-1, 0] - self.f[4][1:-1, 0]) + 1.0 / 6.0 * ux * rho_inlet[1:-1] - psi_x[1:-1, 0] * mu[1:-1, 0] / 6 - psi_y[1:-1, 0] * mu[1:-1, 0] / 4
+                        self.f[2][1:-1, 0] - self.f[4][1:-1, 0]) + 1.0 / 6.0 * ux * rho_inlet[1:-1] - psi_x[1:-1,
+                                                                                                      0] * mu[1:-1,
+                                                                                                           0] / 6 - psi_y[
+                                                                                                                    1:-1,
+                                                                                                                    0] * mu[
+                                                                                                                         1:-1,
+                                                                                                                         0] / 4
                 self.g[i][1:-1, 0] = self.w[i] * psi_in[1:-1] / (self.w[1] + self.w[5] + self.w[8])
             if i == 8:
                 self.f[i][1:-1, 0] = self.f[6][1:-1, 0] + 0.5 * (
-                        self.f[2][1:-1, 0] - self.f[4][1:-1, 0]) + 1.0 / 6.0 * ux * rho_inlet[1:-1] - psi_x[1:-1, 0] * mu[1:-1, 0] / 6 + psi_y[1:-1, 0] * mu[1:-1, 0] / 4
+                        self.f[2][1:-1, 0] - self.f[4][1:-1, 0]) + 1.0 / 6.0 * ux * rho_inlet[1:-1] - psi_x[1:-1,
+                                                                                                      0] * mu[1:-1,
+                                                                                                           0] / 6 + psi_y[
+                                                                                                                    1:-1,
+                                                                                                                    0] * mu[
+                                                                                                                         1:-1,
+                                                                                                                         0] / 4
                 self.g[i][1:-1, 0] = self.w[i] * psi_in[1:-1] / (self.w[1] + self.w[5] + self.w[8])
 
         # left bottom corner node
@@ -340,6 +356,7 @@ class Compute:
         self.g[7][-1, 0] = self.g[5][-1, 0]
 
     """Lattice Boltzmann method: fundamentals and engineering applications with computer codes"""
+
     # open_boundary_with_force
     def zou_he_boundary_outlet(self):
         ux = u0
@@ -393,6 +410,7 @@ def stream(f, g):
             f[i] = np.roll(np.roll(f[i], 1, axis=1), -1, axis=0)
             g[i] = np.roll(np.roll(g[i], 1, axis=1), -1, axis=0)
 
+
 def update(i, x, y, cc):
     print(i)
     plt.cla()
@@ -422,11 +440,10 @@ def bottom_top_wall(f_behind, g_behind, f, g):
             f[i][-1, :] = f_behind[6][-1, :]
             g[i][-1, :] = g_behind[6][-1, :]
 
+
 def main():
     rect_corner_list = []
-    count = 2
-    flag = True
-    mabiki = MAX_T // 150
+
     # for rectangle block
     # while True:
     #     if count * 20 > 360:
@@ -447,38 +464,53 @@ def main():
     #         rect_corner_list.append(((count * 20, 340), ((count + 1) * 20, 360)))
     #         flag = True
     #         count += 2
-    #block_psi_all, corner_list = setblock(rect_corner_list)
+    # block_psi_all, corner_list = setblock(rect_corner_list)
     cr = Createblock(H, W)
     bb = Bounce_back(H, W)
-    circle_list = [[(int(W/2 - W/3), int(H/2)), 30]]
+    circle_list = [[(int(W / 2 - W / 3), int(H / 2)), 30]]
     circle_list = []
     # circle_list.append(((int(W/2), int(H/2)), 30))
-    r = 13
+    r = 20
     xx = 78
     # circle_list.append(((count * 2 * r, xx + r), r))
     # circle_list.append(((count * 2 * r, 2 * xx + 3 * r), r))
     # circle_list.append(((count * 2 * r, 3 * xx + 5 * r + 1),  r + 1))
-    #circle_list.append(((count * 2 * r, 3 * xx + 5 * r), r))
+    # circle_list.append(((count * 2 * r, 3 * xx + 5 * r), r))
+
+    # while True:
+    #     if count * 2 * r > 350:
+    #         break
+    #     if flag:
+    #         circle_list.append(((count * 2 * r, 3 * r), r + 5))
+    #         circle_list.append(((count * 2 * r, xx + 5 * r), r + 5))
+    #         circle_list.append(((count * 2 * r, 2 * xx + 7 * r), r + 5))
+    #         circle_list.append(((count * 2 * r, 3 * xx + 9 * r), r + 5))
+    #         print(3 * xx + 5 * r)
+    #         print(2 * xx + 3 * r)
+    #         flag = False
+    #         count += 2
+    #         continue
+    #     elif not flag:
+    #         circle_list.append(((count * 2 * r, xx + r), r + 5))
+    #         circle_list.append(((count * 2 * r, 2 * xx + 3 * r), r + 5))
+    #         circle_list.append(((count * 2 * r, 3 * xx + 5 * r), r + 5))
+    #         flag = True
+    #         count += 2
+
+    count = 3
+    flag = True
+    mabiki = MAX_T // 150
 
     while True:
-        if count * 2 * r > 350:
+        if count * r > 380:
             break
-        if flag:
-            circle_list.append(((count * 2 * r, 3 * r), r + 5))
-            circle_list.append(((count * 2 * r, xx + 5 * r), r + 5))
-            circle_list.append(((count * 2 * r, 2 * xx + 7 * r), r + 5))
-            circle_list.append(((count * 2 * r, 3 * xx + 9 * r), r + 5))
-            print(3 * xx + 5 * r)
-            print(2 * xx + 3 * r)
-            flag = False
-            count += 2
-            continue
-        elif not flag:
-            circle_list.append(((count * 2 * r, xx + r), r + 5))
-            circle_list.append(((count * 2 * r, 2 * xx + 3 * r), r + 5))
-            circle_list.append(((count * 2 * r, 3 * xx + 5 * r), r + 5))
-            flag = True
-            count += 2
+        circle_list.append(((count * r, 2 * r), r))
+        circle_list.append(((count * r, 6 * r), r))
+        circle_list.append(((count * r, 10 * r), r))
+        circle_list.append(((count * r, 14 * r), r))
+        circle_list.append(((count * r, 18 * r), r))
+        count += 4
+
     block_psi_all, side_list, concave_list, convex_list = cr.setCirleblock(circle_list)
     block_mask = np.where(block_psi_all == 1, True, False)
     mask = np.logical_not(block_mask)
@@ -498,7 +530,7 @@ def main():
         g_behind = copy.deepcopy(cm.g)
         stream(cm.f, cm.g)
         bb.halfway_bounceback_circle(side_list, concave_list, convex_list, f_behind, g_behind, cm.f, cm.g)
-        #halfway_bounceback(corner_list, f_behind, g_behind, cm.f, cm.g)
+        # halfway_bounceback(corner_list, f_behind, g_behind, cm.f, cm.g)
         bottom_top_wall(f_behind[:, 1:-1], g_behind[:, 1:-1], cm.f[:, 1:-1], cm.g[:, 1:-1])
         cm.zou_he_boundary_inlet()
         cm.zou_he_boundary_outlet()
@@ -514,17 +546,17 @@ def main():
         cm.mix_tau = cm.getMix_tau()
     y = [i for i in range(H)]
     x = [i for i in range(W)]
-    fig = plt.figure()
-    plt.colorbar(plt.pcolor(x, y, cc[0], cmap='RdBu'))
-    ani = animation.FuncAnimation(fig, update, fargs=(x, y, cc), frames=int(len(cc)))
-    ani.save('../movies/MAX_T{}_Pe{}_M{}_Ca{}_wall{}.mp4'.format(MAX_T, Pe, M, Ca, psi_wall), fps=10)
+    # fig = plt.figure()
+    # plt.colorbar(plt.pcolor(x, y, cc[0], cmap='RdBu'))
+    # ani = animation.FuncAnimation(fig, update, fargs=(x, y, cc), frames=int(len(cc)))
+    # ani.save('../movies/MAX_T{}_Pe{}_M{}_Ca{}_wall{}.mp4'.format(MAX_T, Pe, M, Ca, psi_wall), fps=10)
     plt.figure()
     plt.pcolor(x, y, cm.psi, label='MAX_T{}_Pe{}_M{}_Ca{}_wall{}'.format(MAX_T, Pe, M, Ca, psi_wall), cmap='RdBu')
     plt.colorbar()
     plt.legend()
-    #plt.grid()
+    # plt.grid()
     plt.show()
-    plt.savefig('../images/MAX_T{}_Pe{}_M{}_Ca{}_wall{}.png'.format(MAX_T, Pe, M, Ca, psi_wall))
+    # plt.savefig('../images/MAX_T{}_Pe{}_M{}_Ca{}_wall{}.png'.format(MAX_T, Pe, M, Ca, psi_wall))
 
 
 if __name__ == '__main__':

@@ -3,6 +3,7 @@ import cv2
 from scipy.ndimage.morphology import binary_fill_holes
 import copy
 
+
 class Createblock:
     def __init__(self, H, W):
         self.H = H
@@ -59,7 +60,7 @@ class Createblock:
         concave_bottom_left = []
         block_psi_all = np.zeros((self.H, self.W), dtype=int)
         for circle in circle_list:
-            print("cirlcle")
+            # print("cirlcle")
             x = copy.deepcopy(circle[0][0])
             y = copy.deepcopy(circle[0][1])
             r = copy.deepcopy(circle[1])
@@ -73,7 +74,7 @@ class Createblock:
             # y軸方向 円の第一象限のみコーナーを検出し, 他は対称性をいかして算出
             jj = r
             for i in range(1, r + 2):
-                #print("I:{}".format(i))
+                # print("I:{}".format(i))
                 flag = False
                 # x軸方向　右端から検出
                 for j in range(jj, 0, -1):
@@ -88,30 +89,30 @@ class Createblock:
                     flag_left = block[y + i, x - 1 + j]
                     flag_left_bottom = block[y + i - 1, x - 1 + j]
 
-                    #if (x + j) > 390 or (y + i) > 390:
-                        #print(x + j, y + i)
+                    # if (x + j) > 390 or (y + i) > 390:
+                    # print(x + j, y + i)
                     if flag_left and flag_bottom:
                         concave_top_right_temp.append((x + j, y + i))
-                        #print("concave:{}".format((x + j, y + i)))
+                        # print("concave:{}".format((x + j, y + i)))
                     elif flag_left:
                         side_left_temp.append((x + j, y + i))
-                        #print("side_left:{}".format((x + j, y + i)))
+                        # print("side_left:{}".format((x + j, y + i)))
                     elif not flag_left and flag_bottom:
                         side_top_temp.append((x + j, y + i))
-                        #print(x + j, y + i)
-                        #print("side_top:{}".format((x + j, y + i)))
+                        # print(x + j, y + i)
+                        # print("side_top:{}".format((x + j, y + i)))
                     elif flag_left_bottom:
                         convex_top_right_temp.append((x + j, y + i))
-                        #print("convex:{}".format((x + j, y + i)))
+                        # print("convex:{}".format((x + j, y + i)))
 
             for t in side_top_temp:
-                #print(t)
+                # print(t)
                 side_top.append((2 * x - t[0], t[1]))
-                #print("左:{}".format((2 * x - t[0], t[1])))
+                # print("左:{}".format((2 * x - t[0], t[1])))
                 side_bottom.append((t[0], 2 * y - t[1]))
-                #print("下:{}".format((t[0], 2 * y - t[1])))
+                # print("下:{}".format((t[0], 2 * y - t[1])))
                 side_bottom.append((2 * x - t[0], 2 * y - t[1]))
-                #print("左下:{}".format((2 * x - t[0], 2 * y - t[1])))
+                # print("左下:{}".format((2 * x - t[0], 2 * y - t[1])))
             side_top.append((x, y + r + 1))
             side_top.extend(side_top_temp)
             side_bottom.append((x, y - r - 1))
@@ -135,8 +136,8 @@ class Createblock:
                 concave_bottom_left.append((2 * x - c[0], 2 * y - c[1]))
             concave_top_right.extend(concave_top_right_temp)
             # print("concave_top_right:{}, concave_top_left:{}, concave_bottom_right:{}, concave_bottom_left:{}"
-                  # .format(len(concave_top_right), len(concave_top_left), len(concave_bottom_right),
-                  #         len(concave_bottom_left)))
+            # .format(len(concave_top_right), len(concave_top_left), len(concave_bottom_right),
+            #         len(concave_bottom_left)))
 
             for v in convex_top_right_temp:
                 convex_top_left.append((2 * x - v[0], v[1]))
@@ -223,5 +224,5 @@ class Createblock:
             corner_list.append(corner)
             # print(block_psi.shape)
             block_psi_all = block_psi_all + block_psi
-        #print(block_psi_all.max(), "max")
+        # print(block_psi_all.max(), "max")
         return block_psi_all, corner_list
