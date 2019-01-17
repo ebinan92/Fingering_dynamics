@@ -17,11 +17,11 @@ import time
 
 H = 400  # lattice dimensions
 W = 420
-MAX_T = 500
+MAX_T = 1000
 psi_wall = -1.0  # wettability on block and wall
-Pe = 50  # Peclet numbernet
-C_W = 2.0 * (10 ** (-5)) / W  # conversion width
-Ca = 7.33 * 10 ** (-3)  # Capillary number
+Pe = 300  # Peclet numbernet
+C_W = 5.0 * (10 ** (-5)) / W  # conversion width
+Ca = 20.00 * 10 ** (-3)  # Capillary number
 M = 20.0  # Eta non_newtonian / Eta newtonian
 R_Nu = 10 ** (-6)  # physical kinematic viscosity of newtonian
 tau = 1 / (3.0 - math.sqrt(3))  # relaxation time
@@ -97,7 +97,9 @@ class Compute:
         self.nabla_psix = np.zeros((H, W))
         self.nabla_psiy = np.zeros((H, W))
         self.nabla_psi2 = np.zeros((H, W))
-        self.rho = np.ones((H, W))[mask] * rho0  # macroscopic density
+        #self.rho = 1.0 - 0.1 * np.random.rand(H, W)[mask]
+        self.rho = np.hstack((1.0 - 0.1 * np.random.rand(H, 10), 1.0 + 0.1 * np.random.rand(H, W - 10)))[mask]
+        #self.rho = np.ones((H, W))[mask] * rho0  # macroscopic density
         self.ux = np.zeros((H, W))[mask]
         self.uy = np.zeros((H, W))[mask]
         self.p = np.zeros((H, W))[mask]
@@ -203,7 +205,7 @@ class Compute:
         v2 = Eta_n * M / self.rho
         mix_v = np.divide(2 * v1 * v2, (v1 * (ones - self.psi[self.mask]) + v2 * (ones + self.psi[self.mask])))
         mix_tau = 3 * mix_v + 0.5
-        print(mix_tau.mean())
+        #print(mix_tau.mean())
         return mix_tau
 
     def udpatePsi(self):
@@ -466,18 +468,31 @@ def main():
     # block_psi_all, corner_list = setblock(rect_corner_list)
     cr = Createblock(H, W)
     bb = Bounce_back(H, W)
-    circle_list = [[(int(W / 2 - W / 3), int(H / 2)), 30]]
-    circle_list = []
+    #circle_list = [[(int(W / 2 - W / 3), int(H / 2)), 30]]
+    ellipse_list = []
     # circle_list.append(((int(W/2), int(H/2)), 30))
     r = 20
-    xx = 78
+    # xx = 78
+    count = 3
+    # flag = True
+    mabiki = MAX_T // 150
+    while True:
+        if count * r > 380:
+            break
+        ellipse_list.append({'c_x': r * count, 'c_y': 2 * r, 'r_x': 40, 'r_y': 30, 'angle': 0})
+        ellipse_list.append({'c_x': r * count, 'c_y': 6 * r, 'r_x': 40, 'r_y': 30, 'angle': 0})
+        ellipse_list.append({'c_x': r * count, 'c_y': 10 * r, 'r_x': 40, 'r_y': 30, 'angle': 0})
+        ellipse_list.append({'c_x': r * count, 'c_y': 14 * r, 'r_x': 30, 'r_y': 40, 'angle': 0})
+        ellipse_list.append({'c_x': r * count, 'c_y': 18 * r, 'r_x': 30, 'r_y': 40, 'angle': 0})
+        #circle_list.append(((count * r, 18 * r), r))
+        count += 4
     # circle_list.append(((count * 2 * r, xx + r), r))
     # circle_list.append(((count * 2 * r, 2 * xx + 3 * r), r))
     # circle_list.append(((count * 2 * r, 3 * xx + 5 * r + 1),  r + 1))
     # circle_list.append(((count * 2 * r, 3 * xx + 5 * r), r))
 
     # while True:
-    #     if count * 2 * r > 350:
+    #     if count * 2 * r > 380:
     #         break
     #     if flag:
     #         circle_list.append(((count * 2 * r, 3 * r), r + 5))
@@ -496,21 +511,17 @@ def main():
     #         flag = True
     #         count += 2
 
-    count = 3
-    flag = True
-    mabiki = MAX_T // 150
+    # while True:
+    #     if count * r > 380:
+    #         break
+    #     circle_list.append(((count * r, 2 * r), r))
+    #     circle_list.append(((count * r, 6 * r), r))
+    #     circle_list.append(((count * r, 10 * r), r))
+    #     circle_list.append(((count * r, 14 * r), r))
+    #     circle_list.append(((count * r, 18 * r), r))
+    #     count += 4
 
-    while True:
-        if count * r > 380:
-            break
-        circle_list.append(((count * r, 2 * r), r))
-        circle_list.append(((count * r, 6 * r), r))
-        circle_list.append(((count * r, 10 * r), r))
-        circle_list.append(((count * r, 14 * r), r))
-        circle_list.append(((count * r, 18 * r), r))
-        count += 4
-
-    block_psi_all, side_list, concave_list, convex_list = cr.setCirleblock(circle_list)
+    block_psi_all, side_list, concave_list, convex_list = cr.setEllipseblock(ellipse_list)
     block_mask = np.where(block_psi_all == 1, True, False)
     mask = np.logical_not(block_mask)
     cm = Compute(mask)
@@ -522,9 +533,9 @@ def main():
             cm.geq[j] = cm.getgeq(j)
             cm.f[j][mask] = cm.getF(j)
             cm.g[j][mask] = cm.getG(j)
-        if i % mabiki == 0:
-            cc = np.append(cc, np.array([cm.psi]), axis=0)
-            print("timestep:{}".format(i))
+        #if i % mabiki == 0:
+            #cc = np.append(cc, np.array([cm.psi]), axis=0)
+        print("timestep:{}".format(i))
         f_behind = copy.deepcopy(cm.f)
         g_behind = copy.deepcopy(cm.g)
         stream(cm.f, cm.g)
