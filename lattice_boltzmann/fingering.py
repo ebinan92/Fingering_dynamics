@@ -19,8 +19,8 @@ H = 400  # lattice dimensions
 W = 420
 MAX_T = 200
 psi_wall = -1.0  # wettability on block and wall
-Pe = 300  # Peclet number
-C_W = 6.0 * (10 ** (-5)) / W  # conversion width
+Pe = 150  # Peclet number
+C_W = 5.0 * (10 ** (-5)) / W  # conversion width
 Ca = 7.33 * 10 ** (-3)  # Capillary number
 M = 20.0  # Eta non_newtonian / Eta newtonian
 R_Nu = 10 ** (-6)  # physical kinematic viscosity of newtonian
@@ -470,15 +470,16 @@ def main():
     circle_list = [[(int(W / 2 - W / 3), int(H / 2)), 30]]
     circle_list = []
     # circle_list.append(((int(W/2), int(H/2)), 30))
-    r = 20
+    #r = 13
     xx = 78
     # circle_list.append(((count * 2 * r, xx + r), r))
     # circle_list.append(((count * 2 * r, 2 * xx + 3 * r), r))
     # circle_list.append(((count * 2 * r, 3 * xx + 5 * r + 1),  r + 1))
     # circle_list.append(((count * 2 * r, 3 * xx + 5 * r), r))
-
+    #count = 2
+    flag = True
     # while True:
-    #     if count * 2 * r > 350:
+    #     if count * 2 * r > 370:
     #         break
     #     if flag:
     #         circle_list.append(((count * 2 * r, 3 * r), r + 5))
@@ -496,22 +497,31 @@ def main():
     #         circle_list.append(((count * 2 * r, 3 * xx + 5 * r), r + 5))
     #         flag = True
     #         count += 2
-
-    count = 3
-    flag = True
+    ellipse_list = []
     mabiki = MAX_T // 150
-
+    count = 3
+    r = 20
+    # while True:
+    #     if count * r > 380:
+    #         break
+    #     circle_list.append(((count * r, 2 * r), r))
+    #     circle_list.append(((count * r, 6 * r), r))
+    #     circle_list.append(((count * r, 10 * r), r))
+    #     circle_list.append(((count * r, 14 * r), r))
+    #     circle_list.append(((count * r, 18 * r), r))
+    #     count += 4
     while True:
         if count * r > 380:
             break
-        circle_list.append(((count * r, 2 * r), r))
-        circle_list.append(((count * r, 6 * r), r))
-        circle_list.append(((count * r, 10 * r), r))
-        circle_list.append(((count * r, 14 * r), r))
-        circle_list.append(((count * r, 18 * r), r))
+        ellipse_list.append({'c_x': r * count, 'c_y': 2 * r, 'r_x': 40, 'r_y': 30, 'angle': 0})
+        ellipse_list.append({'c_x': r * count, 'c_y': 6 * r, 'r_x': 40, 'r_y': 30, 'angle': 0})
+        ellipse_list.append({'c_x': r * count, 'c_y': 10 * r, 'r_x': 40, 'r_y': 30, 'angle': 0})
+        ellipse_list.append({'c_x': r * count, 'c_y': 14 * r, 'r_x': 30, 'r_y': 40, 'angle': 0})
+        ellipse_list.append({'c_x': r * count, 'c_y': 18 * r, 'r_x': 30, 'r_y': 40, 'angle': 0})
+        #circle_list.append(((count * r, 18 * r), r))
         count += 4
 
-    block_psi_all, side_list, concave_list, convex_list = cr.setCirleblock(circle_list)
+    block_psi_all, side_list, concave_list, convex_list = cr.setEllipseblock(ellipse_list)
     block_mask = np.where(block_psi_all == 1, True, False)
     mask = np.logical_not(block_mask)
     cm = Compute(mask)
@@ -523,9 +533,9 @@ def main():
             cm.geq[j] = cm.getgeq(j)
             cm.f[j][mask] = cm.getF(j)
             cm.g[j][mask] = cm.getG(j)
-        if i % mabiki == 0:
-            cc = np.append(cc, np.array([cm.psi]), axis=0)
-            print("timestep:{}".format(i))
+        #if i % mabiki == 0:
+         #   cc = np.append(cc, np.array([cm.psi]), axis=0)
+        print("timestep:{}".format(i))
         f_behind = copy.deepcopy(cm.f)
         g_behind = copy.deepcopy(cm.g)
         stream(cm.f, cm.g)
@@ -554,6 +564,8 @@ def main():
     plt.pcolor(x, y, cm.psi, label='MAX_T{}_Pe{}_M{}_Ca{}_wall{}'.format(MAX_T, Pe, M, Ca, psi_wall), cmap='RdBu')
     plt.colorbar()
     plt.legend()
+    # plt.xticks(np.arange(0, 100, 5))
+    # plt.yticks(np.arange(0, 100, 5))
     # plt.grid()
     plt.show()
     # plt.savefig('../images/MAX_T{}_Pe{}_M{}_Ca{}_wall{}.png'.format(MAX_T, Pe, M, Ca, psi_wall))
