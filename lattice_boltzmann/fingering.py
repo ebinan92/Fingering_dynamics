@@ -2,22 +2,18 @@ import numpy as np
 import sympy
 import matplotlib.pyplot as plt
 import copy
-import cv2
 from create_block import Createblock
 from bounce_back import Bounce_back
 # for server
 # plt.switch_backend('agg')
-import math
-from multiprocessing import Pool
-from scipy.ndimage.morphology import binary_fill_holes
-import matplotlib.animation as animation
+
 
 import math
 import time
 
 H = 400  # lattice dimensions
 W = 420
-MAX_T = 200
+MAX_T = 1
 psi_wall = -1.0  # wettability on block and wall
 Pe = 150  # Peclet number
 C_W = 5.0 * (10 ** (-5)) / W  # conversion width
@@ -510,16 +506,6 @@ def main():
     #     circle_list.append(((count * r, 14 * r), r))
     #     circle_list.append(((count * r, 18 * r), r))
     #     count += 4
-    while True:
-        if count * r > 380:
-            break
-        ellipse_list.append({'c_x': r * count, 'c_y': 2 * r, 'r_x': 40, 'r_y': 30, 'angle': 0})
-        ellipse_list.append({'c_x': r * count, 'c_y': 6 * r, 'r_x': 40, 'r_y': 30, 'angle': 0})
-        ellipse_list.append({'c_x': r * count, 'c_y': 10 * r, 'r_x': 40, 'r_y': 30, 'angle': 0})
-        ellipse_list.append({'c_x': r * count, 'c_y': 14 * r, 'r_x': 30, 'r_y': 40, 'angle': 0})
-        ellipse_list.append({'c_x': r * count, 'c_y': 18 * r, 'r_x': 30, 'r_y': 40, 'angle': 0})
-        #circle_list.append(((count * r, 18 * r), r))
-        count += 4
 
     block_psi_all, side_list, concave_list, convex_list = cr.setEllipseblock(ellipse_list)
     block_mask = np.where(block_psi_all == 1, True, False)

@@ -271,17 +271,17 @@ class Createblock:
                     # print(x + j, y + i)
                     if flag_left and flag_bottom:
                         concave_top_right_temp.append((x + j, y + i))
-                        print("concave:{}".format((x + j, y + i)))
+                        # print("concave:{}".format((x + j, y + i)))
                     elif flag_left:
                         side_left_temp.append((x + j, y + i))
-                        print("side_left:{}".format((x + j, y + i)))
+                        # print("side_left:{}".format((x + j, y + i)))
                     elif not flag_left and flag_bottom:
                         side_top_temp.append((x + j, y + i))
                         # print(x + j, y + i)
-                        print("side_top:{}".format((x + j, y + i)))
+                        # print("side_top:{}".format((x + j, y + i)))
                     elif flag_left_bottom:
                         convex_top_right_temp.append((x + j, y + i))
-                        print("convex:{}".format((x + j, y + i)))
+                        # print("convex:{}".format((x + j, y + i)))
 
             for t in side_top_temp:
                 # print(t)
