@@ -566,17 +566,6 @@ if __name__ == '__main__':
         main()
         t2 = time.time()
         print((t2 - t1) / 60)
-        # H = 30
-        # W = 30
-        # cr = Createblock()
-        # setCirleblock([[(15, 15), 10]])
-        # y = [i for i in range(H)]
-        # x = [i for i in range(W)]
-        # block = cr.getCicleblock((15, 15), 10)
-        # plt.figure()
-        # plt.pcolor(x, y, block)
-        # plt.grid()
-        # plt.show()
         # upload_file_2 = drive.CreateFile()
         # upload_file_2.SetContentFile('MAX_T{}_Pe{}_M{}_Ca{}_wall{}.mp4'.format(MAX_T, Pe, M, Ca, psi_wall))
         # upload_file_2.Upload()
