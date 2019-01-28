@@ -1,5 +1,5 @@
 import numpy as np
-
+import copy
 
 class Bounce_back:
     def __init__(self, H, W):
@@ -8,7 +8,16 @@ class Bounce_back:
 
     """https://www.math.nyu.edu/~billbao/report930.pdf"""
 
-    # mid-grid halfway bounce back
+    def left_boundary(self, f_behind, g_behind, f, g):
+        f[1][:, 0] = copy.deepcopy(f_behind[4][:, 0])
+        g[1][:, 0] = copy.deepcopy(g_behind[4][:, 0])
+        f[5][:, 0] = copy.deepcopy(f_behind[7][:, 0])
+        g[5][:, 0] = copy.deepcopy(g_behind[7][:, 0])
+        f[8][:, 0] = copy.deepcopy(f_behind[6][:, 0])
+        g[8][:, 0] = copy.deepcopy(g_behind[6][:, 0])
+
+        # mid-grid halfway bounce back
+
     def halfway_bounceback_rec(self, corner_list, f_behind, g_behind, f, g):
         self.H = f[0].shape[0]
         self.W = f[0].shape[1]
