@@ -6,24 +6,26 @@ import copy
 from create_block import Createblock
 from bounce_back import Bounce_back
 import matplotlib.animation as animation
+import pickle
 # for server
 # plt.switch_backend('agg')
 import time
 import subprocess
 H = 400  # lattice dimensions
 W = 400
-MAX_T = 10000
-psi_wall = -1.0  # wettability on block and wall
+hole_length = 20
+MAX_T = 100
+psi_wall = -0.5  # wettability on block and wall
 Pe = 15  # Peclet numbernet
-C_W = 5.0 * (10 ** (-5)) / W  # conversion width
-Ca = 2.0 * 10 ** (-2)  # Capillary number
+C_W = 5.0 * (10 ** (-5)) / 400  # top width
+Ca = 4.0 * 10 ** (-2)  # Capillary number
 M = 20.0  # Eta non_newtonian / Eta newtonian
-Eta = 0.001045
-block_num = 8
+Eta = 0.0015
+block_num = 10
 # Eta = 0.001
 R_Nu = Eta / 1000  # physical kinematic viscosity of newtonian
 # tau = 1 / (3.0 - math.sqrt(3))  # relaxation time
-tau = 0.65
+tau = 0.95
 rho0 = 1.0  # non-dimensional pressure
 n_non = 1.0  # rho0 power-law parameter
 R_sigma = 0.045  # physical interfacial tension
@@ -44,7 +46,7 @@ print("Re:{}".format(u0 * 20 / Eta_n))
 Re = u0 * 20 / Eta_n
 
 class Compute:
-    def __init__(self, mask):
+    def __init__(self, mask, init_mask):
         self.mask = mask
         self.e = np.array([np.array([0, 0]) for i in range(9)])
         self.w = np.array([0.0 for i in range(9)])
@@ -86,8 +88,9 @@ class Compute:
                 self.e[i][0] = 1
                 self.e[i][1] = -1
         self.psi = np.full((H, W), -1.0)
-        self.psi[:, :10] = 1.0
+        self.psi[:, :5] = 1.0
         self.block_mask = np.logical_not(mask)
+        self.psi[init_mask] = 1.0
         self.psi[self.block_mask] = psi_wall
         self.left_wall = np.full((H, 1), 1.0)
         self.right_wall = np.full((H, 1), -1.0)
@@ -96,8 +99,7 @@ class Compute:
         self.nabla_psix = np.zeros((H, W))
         self.nabla_psiy = np.zeros((H, W))
         self.nabla_psi2 = np.zeros((H, W))
-        # self.rho = 1.0 - 0.1 * np.random.rand(H, W)[mask]
-        #self.rho = np.hstack((1.0 - 0.1 * np.random.rand(H, 10), 1.0 + 0.1 * np.random.rand(H, W - 10)))[mask]
+        # self.rho = np.hstack((1.0 - 0.1 * np.random.rand(H, 10), 1.0 + 0.3 * np.random.rand(H, W - 10)))[mask]
         self.rho = np.ones((H, W))[mask] * rho0  # macroscopic density
         self.ux = np.zeros((H, W))[mask]
         self.uy = np.zeros((H, W))[mask]
@@ -202,7 +204,6 @@ class Compute:
         v2 = Eta_n * M / self.rho
         mix_v = np.divide(2 * v1 * v2, (v1 * (ones - self.psi[self.mask]) + v2 * (ones + self.psi[self.mask])))
         mix_tau = 3 * mix_v + 0.5
-        # print(mix_tau.mean())
         return mix_tau
 
     def udpatePsi(self):
@@ -214,7 +215,6 @@ class Compute:
         psi_with_block = copy.deepcopy(self.psi)
         psi_with_block[self.block_mask] = psi_wall
         temp = np.hstack((self.left_wall, np.hstack((psi_with_block, self.right_wall))))
-        # temp = np.vstack((self.top_bottom_wall, np.vstack((temp, self.top_bottom_wall))))
         f += 4 * np.roll(temp, -1, axis=1)[:, 1:-1]
         f += -4 * np.roll(temp, 1, axis=1)[:, 1:-1]
         f += np.roll(np.roll(temp, -1, axis=1), -1, axis=0)[:, 1:-1]
@@ -228,7 +228,6 @@ class Compute:
         psi_with_block = copy.deepcopy(self.psi)
         psi_with_block[self.block_mask] = psi_wall
         temp = np.hstack((self.left_wall, np.hstack((psi_with_block, self.right_wall))))
-        # temp = np.vstack((self.top_bottom_wall, np.vstack((temp, self.top_bottom_wall))))
         f += 4 * np.roll(temp, -1, axis=0)[:, 1:-1]
         f += -4 * np.roll(temp, 1, axis=0)[:, 1:-1]
         f += np.roll(np.roll(temp, -1, axis=1), -1, axis=0)[:, 1:-1]
@@ -269,28 +268,23 @@ class Compute:
         mu = self.getMu_plain()
         mask = np.zeros((H, W), dtype=bool)
         mask[int(H/2 - hole):int(H/2 + hole), 0] = True
-        # print(self.f[0][mask].shape)
         rho_inlet = 1 / (1 - ux) * (self.f[0][mask] + self.f[2][mask] + self.f[4][mask] + 2 * (
                 self.f[3][mask] + self.f[6][mask] + self.f[7][mask]) - psi_x[mask] * mu[mask] / 2)
         psi_in = 1.0 - (
                 self.g[0][mask] + self.g[2][mask] + self.g[3][mask] + self.g[4][mask] + self.g[6][mask] + self.g[7][mask])
-        for i in range(9):
-            if i == 1:
-                self.f[i][mask] = self.f[3][mask] + 1.5 * ux * rho_inlet - psi_x[mask] * mu[mask] / 6
-                self.g[i][mask] = self.w[i] * psi_in / (self.w[1] + self.w[5] + self.w[8])
-            if i == 5:
-                self.f[i][mask] = self.f[7][mask] - 0.5 * (
-                        self.f[2][mask] - self.f[4][mask]) + 1.0 / 6.0 * ux * rho_inlet - psi_x[mask] * mu[mask] / 6 - psi_y[mask] * mu[mask] / 4
-                self.g[i][mask] = self.w[i] * psi_in / (self.w[1] + self.w[5] + self.w[8])
-            if i == 8:
-                self.f[i][mask] = self.f[6][mask] + 0.5 * (
-                        self.f[2][mask] - self.f[4][mask]) + 1.0 / 6.0 * ux * rho_inlet - psi_x[mask] * mu[mask] / 6 + psi_y[mask] * mu[mask] / 4
-                self.g[i][mask] = self.w[i] * psi_in / (self.w[1] + self.w[5] + self.w[8])
+        self.f[1][mask] = self.f[3][mask] + 1.5 * ux * rho_inlet - psi_x[mask] * mu[mask] / 6
+        self.g[1][mask] = self.w[1] * psi_in / (self.w[1] + self.w[5] + self.w[8])
+        self.f[5][mask] = self.f[7][mask] - 0.5 * (
+                self.f[2][mask] - self.f[4][mask]) + 1.0 / 6.0 * ux * rho_inlet - psi_x[mask] * mu[mask] / 6 - psi_y[mask] * mu[mask] / 4
+        self.g[5][mask] = self.w[5] * psi_in / (self.w[1] + self.w[5] + self.w[8])
+        self.f[8][mask] = self.f[6][mask] + 0.5 * (
+                self.f[2][mask] - self.f[4][mask]) + 1.0 / 6.0 * ux * rho_inlet - psi_x[mask] * mu[mask] / 6 + psi_y[mask] * mu[mask] / 4
+        self.g[8][mask] = self.w[8] * psi_in / (self.w[1] + self.w[5] + self.w[8])
 
     """Lattice Boltzmann method: fundamentals and engineering applications with computer codes"""
     # open_boundary_with_force
     def zou_he_boundary_outlet(self):
-        ux = u0
+        ux = u0 * 0.1
         psi_x = self.getNabla_psix()[:, -1]
         psi_y = self.getNabla_psiy()[:, -1]
         mu = self.getMu_plain()[:, -1]
@@ -306,6 +300,11 @@ class Compute:
         self.f[7][:, -1] = self.f[5][:, -1] + 0.5 * (
                 self.f[2][:, -1] - self.f[4][:, -1]) - 1.0 / 6.0 * ux * rho_outlet - psi_y * mu / 4 + psi_x * mu / 6
         self.g[7][:, -1] = self.w[7] * psi_out / (self.w[3] + self.w[6] + self.w[7])
+
+    def open_boundary(self):
+        self.f[3][:, -1] = 2 * self.f[3][:, -2] - self.f[3][:, -3]
+        self.f[6][:, -1] = 2 * self.f[6][:, -2] - self.f[6][:, -3]
+        self.f[7][:, -1] = 2 * self.f[7][:, -2] - self.f[7][:, -3]
 
 
 def stream(f, g):
@@ -333,7 +332,7 @@ def update(i, x, y, cc):
     plt.cla()
     plt.pcolor(x, y, cc[i], label='MAX_T{}_Pe{}_M{}_Ca{}_wall{}'.format(MAX_T, Pe, M, Ca, psi_wall), cmap='RdBu')
     # plt.clim(0,1)
-# plt.legend()
+    # plt.legend()
 
 
 def bottom_top_wall(f_behind, g_behind, f, g):
@@ -354,86 +353,33 @@ def bottom_top_wall(f_behind, g_behind, f, g):
 def main():
     cr = Createblock(H, W)
     bb = Bounce_back(H, W)
-    # flag = True
-    mabiki = MAX_T // 150
-    # while True:
-    #     if count * r > 380:
-    #         break
-    #     ellipse_list.append({'c_x': r * count, 'c_y': 2 * r, 'r_x': 40, 'r_y': 30, 'angle': 0})
-    #     ellipse_list.append({'c_x': r * count, 'c_y': 6 * r, 'r_x': 40, 'r_y': 30, 'angle': 0})
-    #     ellipse_list.append({'c_x': r * count, 'c_y': 10 * r, 'r_x': 40, 'r_y': 30, 'angle': 0})
-    #     ellipse_list.append({'c_x': r * count, 'c_y': 14 * r, 'r_x': 30, 'r_y': 40, 'angle': 0})
-    #     ellipse_list.append({'c_x': r * count, 'c_y': 18 * r, 'r_x': 30, 'r_y': 40, 'angle': 0})
-    #     #circle_list.append(((count * r, 18 * r), r))
-    #     count += 4
-    # circle_list.append(((count * 2 * r, xx + r), r))
-    # circle_list.append(((count * 2 * r, 2 * xx + 3 * r), r))
-    # circle_list.append(((count * 2 * r, 3 * xx + 5 * r + 1),  r + 1))
-    # circle_list.append(((count * 2 * r, 3 * xx + 5 * r), r))
-
-    # while True:
-    #     if count * 2 * r > 380:
-    #         break
-    #     if flag:
-    #         circle_list.append(((count * 2 * r, 3 * r), r + 5))
-    #         circle_list.append(((count * 2 * r, xx + 5 * r), r + 5))
-    #         circle_list.append(((count * 2 * r, 2 * xx + 7 * r), r + 5))
-    #         circle_list.append(((count * 2 * r, 3 * xx + 9 * r), r + 5))
-    #         print(3 * xx + 5 * r)
-    #         count += 2
-    #         continue
-    #     elif not flag:
-    #         circle_list.append(((count * 2 * r, xx + r), r + 5))
-    #         circle_list.append(((count * 2 * r, 2 * xx + 3 * r), r + 5))
-    #         circle_list.append(((count * 2 * r, 3 * xx + 5 * r), r + 5))
-    #         flag = True
-    #         count += 2
+    mabiki = MAX_T // 100
     circle_list = []
     r = 10
-    xx = 15
-    count = 2
-    # flag = True
+    xx = 10
+    count = 1
+    z = r + xx - 25
     while True:
         if count * (xx + r) > 380:
             break
         for i in range(block_num):
-            circle_list.append(((count * (r + xx), (2 * i + 1) * (r + xx)), r))
+            circle_list.append(((count * (r + xx) - z, (2 * i + 1) * (r + xx)), r))
         count += 2
+    circle_list2 = []
+    # count = 2
     # while True:
     #     if count * (xx + r) > 380:
     #         break
-    #     if flag:
-    #         for i in range(block_num):
-    #             circle_list.append(((count * (r + xx), (2 * i + 1) * (r + xx)), r))
-    #         count += 2
-    #         flag = False
-    #     else:
-    #         for i in range(block_num - 1):
-    #             circle_list.append(((count * (r + xx), (2 * i + 2) * (r + xx)), r))
-    #         count += 2
-    #         flag = True
-    # r = 20
-    # count = 2
-    # flag = True
-    # ellipse_list = []
-    # mabiki = MAX_T // 150
-    # ellipse_list.append({'c_x': 50, 'c_y': 50, 'r_x': 20, 'r_y': 100, 'angle': 0})
-    # ellipse_list.append({'c_x': 50, 'c_y': 348, 'r_x': 20, 'r_y': 100, 'angle': 0})
-    # while True:
-    #     if count * r > 380:
-    #         break
-    #     ellipse_list.append({'c_x': r * count, 'c_y': 2 * r, 'r_x': 40, 'r_y': 30, 'angle': 0})
-    #     ellipse_list.append({'c_x': r * count, 'c_y': 6 * r, 'r_x': 40, 'r_y': 30, 'angle': 0})
-    #     ellipse_list.append({'c_x': r * count, 'c_y': 10 * r, 'r_x': 40, 'r_y': 30, 'angle': 0})
-    #     ellipse_list.append({'c_x': r * count, 'c_y': 14 * r, 'r_x': 30, 'r_y': 40, 'angle': 0})
-    #     ellipse_list.append({'c_x': r * count, 'c_y': 18 * r, 'r_x': 30, 'r_y': 40, 'angle': 0})
-    #     #circle_list.append(((count * r, 18 * r), r))
-    #     count += 4
-    hole_length = 20
+    #     for i in range(block_num):
+    #         circle_list2.append(((count * (r + xx), (2 * i + 1) * (r + xx)), r + 1))
+    #     count += 2
+
     block_psi_all, side_list, concave_list, convex_list = cr.setCirleblock(circle_list)
+    block_psi_all2, _, _, _ = cr.setCirleblock(circle_list2)
     block_mask = np.where(block_psi_all == 1, True, False)
+    block_mask2 = np.where(block_psi_all2 == 1, True, False)
     mask = np.logical_not(block_mask)
-    cm = Compute(mask)
+    cm = Compute(mask, block_mask2)
     cc = np.array([cm.psi])
     for i in range(MAX_T):
         for j in range(9):
@@ -442,16 +388,16 @@ def main():
             cm.geq[j] = cm.getgeq(j)
             cm.f[j][mask] = cm.getF(j)
             cm.g[j][mask] = cm.getG(j)
-        # if i % mabiki == 0:
-        #     cc = np.append(cc, np.array([cm.psi]), axis=0)
-        print("timestep:{}".format(i))
+        if i % mabiki == 0:
+            cc = np.append(cc, np.array([cm.psi]), axis=0)
+            print("timestep:{}".format(i))
         f_behind = copy.deepcopy(cm.f)
         g_behind = copy.deepcopy(cm.g)
         stream(cm.f, cm.g)
         bb.halfway_bounceback_circle(side_list, concave_list, convex_list, f_behind, g_behind, cm.f, cm.g)
-        bb.left_boundary(f_behind, g_behind, cm.f, cm.g)
-        cm.zou_he_boundary_inlet(hole_length)
+        bb.left_boundary(f_behind, g_behind, cm.f, cm.g, hole_length)
         cm.zou_he_boundary_outlet()
+        cm.zou_he_boundary_inlet(hole_length)
         cm.rho = cm.getRho()
         cm.udpatePsi()
         cm.nabla_psix = cm.getNabla_psix()
@@ -464,18 +410,16 @@ def main():
         cm.mix_tau = cm.getMix_tau()
     y = [i for i in range(H)]
     x = [i for i in range(W)]
-    #     fig = plt.figure()
-    #     plt.colorbar(plt.pcolor(x, y, cc[0], cmap='RdBu'))
-    #     ani = animation.FuncAnimation(fig, update, fargs=(x, y, cc), frames=int(len(cc)))
-    #     ani.save('../movies/b_num{}_Pe{}_M{}_Ca{:.4f}_wall{}_Re{:.2f}_sigma{}_tau{}_Eta{}.mp4'.format(block_num, Pe, M, Ca, psi_wall, Re, R_sigma, tau, Eta), fps=10)
+    fig = plt.figure()
+    plt.colorbar(plt.pcolor(x, y, cc[0], cmap='RdBu'))
+    ani = animation.FuncAnimation(fig, update, fargs=(x, y, cc), frames=int(len(cc)))
+    ani.save('../movies/b_num{}_Pe{}_M{}_Ca{:.4f}_wall{}_Re{:.2f}_sigma{}_tau{}_Eta{}.mp4'.format(block_num, Pe, M, Ca, psi_wall, Re, R_sigma, tau, Eta), fps=10)
     plt.figure()
     plt.pcolor(x, y, cm.psi, cmap='RdBu')
     plt.colorbar()
-    #plt.legend()
-    # plt.grid()
-    plt.show()
-
-#     plt.savefig('../images/b_num{}_Pe{}_M{}_Ca{:.4f}_wall{}_Re{:.2f}_sigma{}_tau{}_Eta{}.png'.format(block_num, Pe, M, Ca, psi_wall, Re, R_sigma, tau, Eta))
+    plt.savefig('../images/b_num{}_Pe{}_M{}_Ca{:.4f}_wall{}_Re{:.2f}_sigma{}_tau{}_Eta{}.png'.format(block_num, Pe, M, Ca, psi_wall, Re, R_sigma, tau, Eta))
+    f = open('../pickles/b_num{}_Pe{}_M{}_Ca{:.4f}_wall{}_Re{:.2f}_sigma{}_tau{}_Eta{}.txt'.format(block_num, Pe, M, Ca, psi_wall, Re, R_sigma, tau, Eta), 'wb')
+    pickle.dump(cm.psi, f)
 
 if __name__ == '__main__':
     np.seterr(all='raise')
@@ -484,7 +428,7 @@ if __name__ == '__main__':
         main()
         t2 = time.time()
         print((t2 - t1) / 60)
-    #         subprocess.call(["gdrive upload ../movies/b_num{}_Pe{}_M{}_Ca{:.4f}_wall{}_Re{:.2f}_sigma{}_tau{}_Eta{}.mp4".format(block_num, Pe, M, Ca, psi_wall, Re, R_sigma, tau, Eta)], shell=True)
-    #         subprocess.call(["gdrive upload ../images/b_num{}_Pe{}_M{}_Ca{:.4f}_wall{}_Re{:.2f}_sigma{}_tau{}_Eta{}.png".format(block_num, Pe, M, Ca, psi_wall, Re, R_sigma, tau, Eta)], shell=True)
+        subprocess.call(["gdrive upload ../movies/b_num{}_Pe{}_M{}_Ca{:.4f}_wall{}_Re{:.2f}_sigma{}_tau{}_Eta{}.mp4".format(block_num, Pe, M, Ca, psi_wall, Re, R_sigma, tau, Eta)], shell=True)
+        #subprocess.call(["gdrive upload ../images/b_num{}_Pe{}_M{}_Ca{:.4f}_wall{}_Re{:.2f}_sigma{}_tau{}_Eta{}.png".format(block_num, Pe, M, Ca, psi_wall, Re, R_sigma, tau, Eta)], shell=True)
     except Warning as e:
         print(e)
