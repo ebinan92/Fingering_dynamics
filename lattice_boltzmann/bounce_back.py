@@ -1,20 +1,23 @@
 import numpy as np
 import copy
 
+
 class Bounce_back:
     def __init__(self, H, W):
         self.H = H
         self.W = W
 
     """https://www.math.nyu.edu/~billbao/report930.pdf"""
-
-    def left_boundary(self, f_behind, g_behind, f, g):
-        f[1][:, 0] = copy.deepcopy(f_behind[4][:, 0])
-        g[1][:, 0] = copy.deepcopy(g_behind[4][:, 0])
-        f[5][:, 0] = copy.deepcopy(f_behind[7][:, 0])
-        g[5][:, 0] = copy.deepcopy(g_behind[7][:, 0])
-        f[8][:, 0] = copy.deepcopy(f_behind[6][:, 0])
-        g[8][:, 0] = copy.deepcopy(g_behind[6][:, 0])
+    def left_boundary(self, f_behind, g_behind, f, g, hole):
+        mask = np.zeros((self.H, self.W), dtype=bool)
+        mask[:int(self.H / 2 - hole), 0] = True
+        mask[int(self.H / 2 + hole):, 0] = True
+        f[1][mask] = copy.deepcopy(f_behind[3][mask])
+        g[1][mask] = copy.deepcopy(g_behind[3][mask])
+        f[5][mask] = copy.deepcopy(f_behind[7][mask])
+        g[5][mask] = copy.deepcopy(g_behind[7][mask])
+        f[8][mask] = copy.deepcopy(f_behind[6][mask])
+        g[8][mask] = copy.deepcopy(g_behind[6][mask])
 
         # mid-grid halfway bounce back
 
