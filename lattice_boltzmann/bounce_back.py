@@ -34,57 +34,57 @@ class Bounce_back:
         se_corner = np.zeros((self.H, self.W), dtype=bool)
         for cor in corner_list:
             # print(cor['top_left'], cor['top_right'], cor['bottom_right'], cor['bottom_left'])
-            n_barrier[cor['top_left'][1] + 1, cor['top_left'][0] + 1:cor['top_right'][0]] = True
-            s_barrier[cor['bottom_left'][1] - 1, cor['top_left'][0] + 1:cor['top_right'][0]] = True
-            w_barrier[cor['bottom_left'][1] + 1:cor['top_left'][1], cor['top_right'][0] + 1] = True
-            e_barrier[cor['bottom_left'][1] + 1:cor['top_left'][1], cor['top_left'][0] - 1] = True
-            nw_corner[cor['top_right'][1] + 1, cor['top_right'][0] + 1] = True
-            ne_corner[cor['top_left'][1] + 1, cor['top_left'][0] - 1] = True
-            sw_corner[cor['bottom_right'][1] - 1, cor['bottom_right'][0] + 1] = True
-            se_corner[cor['bottom_left'][1] - 1, cor['bottom_left'][0] - 1] = True
+            n_barrier[cor['top_left'][1] + 1, cor['top_left'][0]:cor['top_right'][0] + 1] = True
+            s_barrier[cor['bottom_left'][1] - 1, cor['top_left'][0]:cor['top_right'][0] + 1] = True
+            w_barrier[cor['bottom_left'][1]:cor['top_left'][1] + 1, cor['top_left'][0] - 1] = True
+            e_barrier[cor['bottom_left'][1]:cor['top_left'][1] + 1, cor['top_right'][0] + 1] = True
+            nw_corner[cor['top_left'][1] + 1, cor['top_left'][0] - 1] = True
+            ne_corner[cor['top_left'][1] + 1, cor['top_right'][0] + 1] = True
+            sw_corner[cor['bottom_left'][1] - 1, cor['bottom_left'][0] - 1] = True
+            se_corner[cor['bottom_left'][1] - 1, cor['bottom_right'][0] + 1] = True
             # print(cor['top_left'], cor['top_right'], cor['bottom_left'], cor['bottom_right'])
 
         for i in range(9):
             if i == 1:
-                f[i][w_barrier] = f_behind[3][w_barrier]
-                g[i][w_barrier] = g_behind[3][w_barrier]
+                f[i][e_barrier] = f_behind[3][e_barrier]
+                g[i][e_barrier] = g_behind[3][e_barrier]
             elif i == 2:
                 f[i][n_barrier] = f_behind[4][n_barrier]
                 g[i][n_barrier] = g_behind[4][n_barrier]
             elif i == 3:
-                f[i][e_barrier] = f_behind[1][e_barrier]
-                g[i][e_barrier] = g_behind[1][e_barrier]
+                f[i][w_barrier] = f_behind[1][w_barrier]
+                g[i][w_barrier] = g_behind[1][w_barrier]
             elif i == 4:
                 f[i][s_barrier] = f_behind[2][s_barrier]
                 g[i][s_barrier] = g_behind[2][s_barrier]
             elif i == 5:
-                f[i][nw_corner] = f_behind[7][nw_corner]
-                g[i][nw_corner] = g_behind[7][nw_corner]
+                f[i][ne_corner] = f_behind[7][ne_corner]
+                g[i][ne_corner] = g_behind[7][ne_corner]
                 f[i][n_barrier] = f_behind[7][n_barrier]
                 g[i][n_barrier] = g_behind[7][n_barrier]
-                f[i][w_barrier] = f_behind[7][w_barrier]
-                g[i][w_barrier] = g_behind[7][w_barrier]
+                f[i][e_barrier] = f_behind[7][e_barrier]
+                g[i][e_barrier] = g_behind[7][e_barrier]
             elif i == 6:
-                f[i][ne_corner] = f_behind[8][ne_corner]
-                g[i][ne_corner] = g_behind[8][ne_corner]
+                f[i][nw_corner] = f_behind[8][nw_corner]
+                g[i][nw_corner] = g_behind[8][nw_corner]
                 f[i][n_barrier] = f_behind[8][n_barrier]
                 g[i][n_barrier] = g_behind[8][n_barrier]
-                f[i][e_barrier] = f_behind[8][e_barrier]
-                g[i][e_barrier] = g_behind[8][e_barrier]
+                f[i][w_barrier] = f_behind[8][w_barrier]
+                g[i][w_barrier] = g_behind[8][w_barrier]
             elif i == 7:
-                f[i][se_corner] = f_behind[5][se_corner]
-                g[i][se_corner] = g_behind[5][se_corner]
+                f[i][sw_corner] = f_behind[5][sw_corner]
+                g[i][sw_corner] = g_behind[5][sw_corner]
                 f[i][s_barrier] = f_behind[5][s_barrier]
                 g[i][s_barrier] = g_behind[5][s_barrier]
-                f[i][e_barrier] = f_behind[5][e_barrier]
-                g[i][e_barrier] = g_behind[5][e_barrier]
+                f[i][w_barrier] = f_behind[5][w_barrier]
+                g[i][w_barrier] = g_behind[5][w_barrier]
             elif i == 8:
-                f[i][sw_corner] = f_behind[6][sw_corner]
-                g[i][sw_corner] = g_behind[6][sw_corner]
+                f[i][se_corner] = f_behind[6][se_corner]
+                g[i][se_corner] = g_behind[6][se_corner]
                 f[i][s_barrier] = f_behind[6][s_barrier]
                 g[i][s_barrier] = g_behind[6][s_barrier]
-                f[i][w_barrier] = f_behind[6][w_barrier]
-                g[i][w_barrier] = g_behind[6][w_barrier]
+                f[i][e_barrier] = f_behind[6][e_barrier]
+                g[i][e_barrier] = g_behind[6][e_barrier]
 
     # mid-grid halfway bounce back
     def halfway_bounceback_circle(self, side_list, concave_list, convex_list, f_behind, g_behind, f, g):
