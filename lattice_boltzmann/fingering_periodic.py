@@ -1,5 +1,4 @@
 import numpy as np
-import sympy
 import matplotlib.pyplot as plt
 import copy
 from create_block import Createblock
@@ -8,44 +7,49 @@ import matplotlib.animation as animation
 # for server
 # plt.switch_backend('agg')
 import time
+import math
+import subprocess
 
-H = 400  # lattice dimensions
-W = 420
-MAX_T = 1000
-psi_wall = -1.0  # wettability on block and wall
-Pe = 200 # Peclet numbernet
-C_W = 5.0 * (10 ** (-5)) / W  # conversion width
-Ca = 7.00 * 10 ** (-3)  # Capillary number
+'''fingering without top and bottom wall'''
+
+H = 400  # height
+W = 400  # width
+MAX_T = 4000  # max_time
+psi_wall = -0.5  # wettability on block and wall
+Pe = 15  # Peclet numbernet
+C_W = 1.5 * 10 ** (-7)  # top width
+Ca = 2.0 * 7.33 * 10 ** (-3)  # Capillary number
 M = 20.0  # Eta non_newtonian / Eta newtonian
-Eta = 0.0007
-# Eta = 0.001
-R_Nu = Eta / 1000  # physical kinematic viscosity of newtonian
-# tau = 1 / (3.0 - math.sqrt(3))  # relaxation time
-tau = 0.71
-rho0 = 1.0  # non-dimensional pressure
+Eta = 0.001
+block_num = 10
+R_Nu = Eta / 1000  # 73 physical kinematic viscosity of newtonian
+tau = 1 / (3.0 - math.sqrt(3))  # relaxation time
+# tau = 0.76
+rho0 = 1.0  # non-dimensional pressu:qre
 n_non = 1.0  # rho0 power-law parameter
 R_sigma = 0.045  # physical interfacial tension
 C_rho = 1.0 * 10 ** 3  # conversion pressure
 v0 = (tau - 0.5) / 3  # non-dimensional kinematic viscosity of newtonian
 C_t = v0 / R_Nu * (C_W ** 2)  # conversion time step
 Eta_n = Eta / (C_rho * (C_W ** 2) / C_t)  # non_dimentional Eta newtonian　
-# x_array = np.arange(1.0, 1.7, 0.01)* 100
 sigma = R_sigma * (C_t ** 2) / (C_rho * (C_W ** 3))  # interfacial tension
 u0 = Ca * sigma / (rho0 * v0)  # inlet velocity
 xi = 2.0  # interface thickness
 kappa = 0.75 * sigma * xi  # interfacial tension
 a = - 2.0 * kappa / (xi ** 2)
-gamma = u0 * W / ((-a * Pe) * (tau - 0.5))
-x = sympy.symbols('x')
+gamma = u0 * 20 / ((-a * Pe) * (tau - 0.5))
 print("u0:{}".format(u0))
-print("Re:{}".format(u0 * 40 / Eta_n))
+print("Re:{}".format(u0 * 20 / Eta_n))
+print("u0_real:{}".format(u0 * C_W / C_t))
+Re = u0 * 20 / Eta_n
 
 
 class Compute:
     def __init__(self, mask):
         self.mask = mask
-        self.e = np.array([np.array([0, 0]) for i in range(9)])
-        self.w = np.array([0.0 for i in range(9)])
+        self.e = np.array([np.array([0, 0]) for _ in range(9)])
+        self.w = np.array([0.0 for _ in range(9)])
+        # 速度分布関数の方向ベクトルと重み設定
         for i in range(9):
             if i == 0:
                 self.w[i] = 4 / 9
@@ -84,7 +88,7 @@ class Compute:
                 self.e[i][0] = 1
                 self.e[i][1] = -1
         self.psi = np.full((H, W), -1.0)
-        self.psi[:, :10] = 1.0
+        self.psi[:, :5] = 1.0
         self.block_mask = np.logical_not(mask)
         self.psi[self.block_mask] = psi_wall
         self.left_wall = np.full((H, 1), 1.0)
@@ -262,7 +266,10 @@ class Compute:
     """http://phelafel.technion.ac.il/~drorden/project/ZouHe.pdf"""
 
     def zou_he_boundary_inlet(self):
-        ux = u0
+        # 注入速度をガウス分布ライクにする
+        temp = np.array([i * 3 / (H / 2) for i in range(int(-H / 2), int(H / 2))])
+        ux = u0 * np.exp(- (temp ** 2) / 2)
+
         psi_x = self.getNabla_psix()
         psi_y = self.getNabla_psiy()
         mu = self.getMu_plain()
@@ -273,7 +280,7 @@ class Compute:
                                                                                                           :, 0])
         for i in range(9):
             if i == 1:
-                self.f[i][:, 0] = self.f[3][:, 0] + 1.5 * ux * rho_inlet[:] - psi_x[:, 0] * mu[:, 0] / 6
+                self.f[i][:, 0] = self.f[3][:, 0] + 2 / 3 * ux * rho_inlet[:] - psi_x[:, 0] * mu[:, 0] / 6
                 self.g[i][:, 0] = self.w[i] * psi_in[:] / (self.w[1] + self.w[5] + self.w[8])
             if i == 5:
                 self.f[i][:, 0] = self.f[7][:, 0] - 0.5 * (
@@ -294,11 +301,11 @@ class Compute:
                                                                                                                          0] / 4
                 self.g[i][:, 0] = self.w[i] * psi_in[:] / (self.w[1] + self.w[5] + self.w[8])
 
-    """Lattice Boltzmann method: fundamentals and engineering applications with computer codes"""
-
     # open_boundary_with_force
     def zou_he_boundary_outlet(self):
-        ux = u0
+        temp = np.array([i * 3 / (H / 2) for i in range(int(-H / 2), int(H / 2))])
+        ux = u0 * np.exp(- (temp ** 2) / 2)
+
         psi_x = self.getNabla_psix()[:, -1]
         psi_y = self.getNabla_psiy()[:, -1]
         mu = self.getMu_plain()[:, -1]
@@ -306,7 +313,8 @@ class Compute:
                 self.f[1][:, -1] + self.f[5][:, -1] + self.f[8][:, -1]) + psi_x * mu / 2)
         psi_out = -1.0 - (self.g[0][:, -1] + self.g[1][:, -1] + self.g[2][:, -1] + self.g[4][:, -1] + self.g[5][:, -1] +
                           self.g[8][:, -1])
-        self.f[3][:, -1] = self.f[1][:, -1] - 1.5 * ux * rho_outlet + psi_x * mu / 6
+
+        self.f[3][:, -1] = self.f[1][:, -1] - 2 / 3 * ux * rho_outlet + psi_x * mu / 6
         self.g[3][:, -1] = self.w[3] * psi_out / (self.w[3] + self.w[6] + self.w[7])
         self.f[6][:, -1] = self.f[8][:, -1] - 0.5 * (
                 self.f[2][:, -1] - self.f[4][:, -1]) - 1.0 / 6.0 * ux * rho_outlet + psi_y * mu / 4 + psi_x * mu / 6
@@ -317,7 +325,6 @@ class Compute:
 
 
 def stream(f, g):
-    # with open_boundary on right side
     f[1] = np.roll(f[1], 1, axis=1)
     g[1] = np.roll(g[1], 1, axis=1)
     f[2] = np.roll(f[2], 1, axis=0)
@@ -341,7 +348,7 @@ def update(i, x, y, cc):
     plt.cla()
     plt.pcolor(x, y, cc[i], label='MAX_T{}_Pe{}_M{}_Ca{}_wall{}'.format(MAX_T, Pe, M, Ca, psi_wall), cmap='RdBu')
     # plt.clim(0,1)
-    plt.legend()
+    # plt.legend()
 
 
 def bottom_top_wall(f_behind, g_behind, f, g):
@@ -362,10 +369,7 @@ def bottom_top_wall(f_behind, g_behind, f, g):
 def main():
     cr = Createblock(H, W)
     bb = Bounce_back(H, W)
-    r = 20
-    count = 3
     # flag = True
-    mabiki = MAX_T // 150
     # while True:
     #     if count * r > 380:
     #         break
@@ -390,8 +394,6 @@ def main():
     #         circle_list.append(((count * 2 * r, 2 * xx + 7 * r), r + 5))
     #         circle_list.append(((count * 2 * r, 3 * xx + 9 * r), r + 5))
     #         print(3 * xx + 5 * r)
-    #         print(2 * xx + 3 * r)
-    #         flag = False
     #         count += 2
     #         continue
     #     elif not flag:
@@ -400,16 +402,49 @@ def main():
     #         circle_list.append(((count * 2 * r, 3 * xx + 5 * r), r + 5))
     #         flag = True
     #         count += 2
+    mabiki = MAX_T // 100
     circle_list = []
+    r = 10
+    xx = 10
+    count = 1
+    z = r + xx - 25
+
     while True:
-        if count * r > 380:
+        if count * (xx + r) - z > 380:
             break
-        circle_list.append(((count * r, 2 * r), r))
-        circle_list.append(((count * r, 6 * r), r))
-        circle_list.append(((count * r, 10 * r), r))
-        circle_list.append(((count * r, 14 * r), r))
-        circle_list.append(((count * r, 18 * r), r))
-        count += 4
+        for i in range(block_num):
+            # 格子サイズにランダム性をもたすとき
+            # my_number = np.random.choice((-1, 1))
+            # random_r = int(r + my_number * math.floor((np.random.rand() * 3)))
+            circle_list.append(((count * (r + xx) - z, (2 * i + 1) * (r + xx)), r))
+        count += 2
+
+    # if psi_wall >= 0, coating circle block with injection fluid
+    circle_list2 = []
+    count = 1
+    while True:
+        if count * (xx + r) - z > 0:
+            break
+        for i in range(block_num):
+            circle_list2.append(((count * (r + xx) - z, (2 * i + 1) * (r + xx)), r + 1))
+        count += 2
+    # r = 20
+    # count = 2
+    # flag = True
+    # ellipse_list = []
+    # mabiki = MAX_T // 150
+    # ellipse_list.append({'c_x': 50, 'c_y': 95, 'r_x': 20, 'r_y': 190, 'angle': 0})
+    # ellipse_list.append({'c_x': 50, 'c_y': 210, 'r_x': 20, 'r_y': 190, 'angle': 0})
+    # while True:
+    #     if count * r > 380:
+    #         break
+    #     ellipse_list.append({'c_x': r * count, 'c_y': 2 * r, 'r_x': 40, 'r_y': 30, 'angle': 0})
+    #     ellipse_list.append({'c_x': r * count, 'c_y': 6 * r, 'r_x': 40, 'r_y': 30, 'angle': 0})
+    #     ellipse_list.append({'c_x': r * count, 'c_y': 10 * rr, 'r_x': 40, 'r_y': 30, 'angle': 0})
+    #     ellipse_list.append({'c_x': r * count, 'c_y': 14 * r, 'r_x': 30, 'r_y': 40, 'angle': 0})
+    #     ellipse_list.append({'c_x': r * count, 'c_y': 18 * r, 'r_x': 30, 'r_y': 40, 'angle': 0})
+    #     #circle_list.append(((count * r, 18 * r), r))
+    #     count += 4
 
     block_psi_all, side_list, concave_list, convex_list = cr.setCirleblock(circle_list)
     block_mask = np.where(block_psi_all == 1, True, False)
@@ -423,9 +458,9 @@ def main():
             cm.geq[j] = cm.getgeq(j)
             cm.f[j][mask] = cm.getF(j)
             cm.g[j][mask] = cm.getG(j)
-        if i % mabiki == 0:
-            cc = np.append(cc, np.array([cm.psi]), axis=0)
-            print("timestep:{}".format(i))
+        # if i % mabiki == 0:
+        #     cc = np.append(cc, np.array([cm.psi]), axis=0)
+        print("timestep:{}".format(i))
         f_behind = copy.deepcopy(cm.f)
         g_behind = copy.deepcopy(cm.g)
         stream(cm.f, cm.g)
@@ -444,17 +479,18 @@ def main():
         cm.mix_tau = cm.getMix_tau()
     y = [i for i in range(H)]
     x = [i for i in range(W)]
-    fig = plt.figure()
-    plt.colorbar(plt.pcolor(x, y, cc[0], cmap='RdBu'))
-    ani = animation.FuncAnimation(fig, update, fargs=(x, y, cc), frames=int(len(cc)))
-    ani.save('../movies/MAX_T{}_Pe{}_M{}_Ca{}_wall{}.mp4'.format(MAX_T, Pe, M, Ca, psi_wall), fps=10)
+    #     fig = plt.figure()
+    #     plt.colorbar(plt.pcolor(x, y, cc[0], cmap='RdBu'))
+    #     ani = animation.FuncAnimation(fig, update, fargs=(x, y, cc), frames=int(len(cc)))
+    #     ani.save('../movies/b_num{}_Pe{}_M{}_Ca{:.4f}_wall{}_Re{:.2f}_sigma{}_tau{}_Eta{}.mp4'.format(block_num, Pe, M, Ca, psi_wall, Re, R_sigma, tau, Eta), fps=10)
     plt.figure()
-    plt.pcolor(x, y, cm.psi, label='MAX_T{}_Pe{}_M{}_Ca{}_wall{}'.format(MAX_T, Pe, M, Ca, psi_wall), cmap='RdBu')
+    plt.pcolor(x, y, cm.psi, cmap='RdBu')
     plt.colorbar()
-    plt.legend()
+    # plt.legend()
     # plt.grid()
-    # plt.show()
-    plt.savefig('../images/MAX_T{}_Pe{}_M{}_Ca{}_wall{}.png'.format(MAX_T, Pe, M, Ca, psi_wall))
+    plt.gca().set_aspect('equal', adjustable='box')
+    plt.show()
+    # plt.savefig('../images/b_num{}_Pe{}_M{}_Ca{:.4f}_wall{}_Re{:.2f}_sigma{}_tau{}_Eta{}.png'.format(block_num, Pe, M, Ca, psi_wall, Re, R_sigma, tau, Eta))
 
 
 if __name__ == '__main__':
@@ -464,5 +500,8 @@ if __name__ == '__main__':
         main()
         t2 = time.time()
         print((t2 - t1) / 60)
+        # 自動アップロード
+        # subprocess.call(["gdrive upload ../movies/b_num{}_Pe{}_M{}_Ca{:.4f}_wall{}_Re{:.2f}_sigma{}_tau{}_Eta{}.mp4".format(block_num, Pe, M, Ca, psi_wall, Re, R_sigma, tau, Eta)], shell=True)
+        # subprocess.call(["gdrive upload ../images/b_num{}_Pe{}_M{}_Ca{:.4f}_wall{}_Re{:.2f}_sigma{}_tau{}_Eta{}.png".format(block_num, Pe, M, Ca, psi_wall, Re, R_sigma, tau, Eta)], shell=True)
     except Warning as e:
         print(e)

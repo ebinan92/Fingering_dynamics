@@ -35,7 +35,7 @@ class Createblock:
         cv2.ellipse(block, (center, axes, angle), (1, 0, 0))
         return block
 
-
+    # 　長方形の境界を取得
     def getCorner(self, block):
         points = cv2.findNonZero(block)
         x, y, w, h = cv2.boundingRect(points)
@@ -47,7 +47,7 @@ class Createblock:
                   'bottom_right': bottom_right}
         return corner
 
-    # 8つのコーナーと4つの面で場合わけ
+    # 円の境界を取得
     def setCirleblock(self, circle_list):
         convex_list = []
         concave_list = []
@@ -77,7 +77,7 @@ class Createblock:
             side_left_temp = []
             convex_top_right_temp = []
             concave_top_right_temp = []
-            # y軸方向 円の第一象限のみコーナーを検出し, 他は対称性をいかして算出
+            # 円の第一象限のみコーナーを検出し, 他は対称性をいかして算出
             jj = r
             for i in range(1, r + 2):
                 # print("I:{}".format(i))
@@ -219,8 +219,9 @@ class Createblock:
 
         return block_psi_all, side_list, concave_list, convex_list
 
+    # 楕円の境界を取得
     def setEllipseblock(self, ellipse_list):
-        #eclipse_list = dict{'c_x':, 'c_y': , 'r_x': ,'r_y':}
+        # eclipse_list = dict{'c_x':, 'c_y': , 'r_x': ,'r_y':}
         convex_list = []
         concave_list = []
         side_list = []
@@ -390,7 +391,6 @@ class Createblock:
         convex_list.append(vex_bl_mask)
 
         return block_psi_all, side_list, concave_list, convex_list
-
 
     def setblock(self, rect_corner_list):
         corner_list = []

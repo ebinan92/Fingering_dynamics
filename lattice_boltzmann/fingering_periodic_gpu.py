@@ -16,6 +16,7 @@ import numpy as np
 import math
 import time
 
+'''GPU version'''
 H = 400  # lattice dimensions
 W = 420
 MAX_T = 1000
@@ -303,7 +304,7 @@ class Compute:
                                                                                                           :, 0])
         for i in range(9):
             if i == 1:
-                self.f[i][:, 0] = self.f[3][:, 0] + 1.5 * ux * rho_inlet[:] - psi_x[:, 0] * mu[:, 0] / 6
+                self.f[i][:, 0] = self.f[3][:, 0] + 2 / 3 * ux * rho_inlet[:] - psi_x[:, 0] * mu[:, 0] / 6
                 self.g[i][:, 0] = self.w[i] * psi_in[:] / (self.w[1] + self.w[5] + self.w[8])
             if i == 5:
                 self.f[i][:, 0] = self.f[7][:, 0] - 0.5 * (
@@ -368,7 +369,7 @@ class Compute:
                 self.f[1][:, -1] + self.f[5][:, -1] + self.f[8][:, -1]) + psi_x * mu / 2)
         psi_out = -1.0 - (self.g[0][:, -1] + self.g[1][:, -1] + self.g[2][:, -1] + self.g[4][:, -1] + self.g[5][:, -1] +
                           self.g[8][:, -1])
-        self.f[3][:, -1] = self.f[1][:, -1] - 1.5 * ux * rho_outlet + psi_x * mu / 6
+        self.f[3][:, -1] = self.f[1][:, -1] - 2 / 3 * ux * rho_outlet + psi_x * mu / 6
         self.g[3][:, -1] = self.w[3] * psi_out / (self.w[3] + self.w[6] + self.w[7])
         self.f[6][:, -1] = self.f[8][:, -1] - 0.5 * (
                 self.f[2][:, -1] - self.f[4][:, -1]) - 1.0 / 6.0 * ux * rho_outlet + psi_y * mu / 4 + psi_x * mu / 6

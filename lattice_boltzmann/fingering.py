@@ -4,39 +4,50 @@ import matplotlib.pyplot as plt
 import copy
 from create_block import Createblock
 from bounce_back import Bounce_back
+import matplotlib.animation as animation
 # for server
 # plt.switch_backend('agg')
-
-
 import math
 import time
+import subprocess
 
-H = 400  # lattice dimensions
-W = 420
-MAX_T = 1
+'''fingering with top and bottom wall'''
+
+H = 380  # lattice dimensions
+W = 380
+MAX_T = 1000
 psi_wall = -1.0  # wettability on block and wall
-Pe = 150  # Peclet number
-C_W = 5.0 * (10 ** (-5)) / W  # conversion width
-Ca = 7.33 * 10 ** (-3)  # Capillary number
+Pe = 400  # Peclet numbernet
+C_W = 1.5 * (10 ** (-7))  # conversion width
+Ca = 3.0 * 7.33 * (10 ** (-3))  # Capillary number
 M = 20.0  # Eta non_newtonian / Eta newtonian
-R_Nu = 10 ** (-6)  # physical kinematic viscosity of newtonian
+Eta = 0.001
+block_num = 10
+# Eta = 0.001
+R_Nu = Eta / 1000  # physical kinematic viscosity of newtonian
 tau = 1 / (3.0 - math.sqrt(3))  # relaxation time
+# tau = 0.85
 rho0 = 1.0  # non-dimensional pressure
 n_non = 1.0  # rho0 power-law parameter
 R_sigma = 0.045  # physical interfacial tension
-C_rho = 1.0 * 10 ** 3  # conversion pressure
-v1 = (tau - 0.5) / 3  # non-dimensional kinematic viscosity of newtonian
-C_t = v1 / R_Nu * (C_W ** 2)  # conversion time step
-Eta_n = 0.001 / (C_rho * (C_W ** 2) / C_t)  # non_dimentional Eta newtonian　
+C_rho = 1000  # conversion pressure
+v0 = (tau - 0.5) / 3  # non-dimensional kinematic viscosity of newtonian
+C_t = (v0 / R_Nu) * (C_W ** 2)  # conversion time step
+Eta_n = Eta * C_t / (C_rho * (C_W ** 2))  # non_dimentional Eta newtonian　
 # x_array = np.arange(1.0, 1.7, 0.01)* 100
 sigma = R_sigma * (C_t ** 2) / (C_rho * (C_W ** 3))  # interfacial tension
-u0 = Ca * sigma / (rho0 * v1)  # inlet velocity
+u0 = Ca * sigma / Eta_n  # inlet velocity
 xi = 2.0  # interface thickness
-kappa = 0.75 * sigma * xi  # interfacial tension
+kappa = 0.75 * xi * sigma
 a = - 2.0 * kappa / (xi ** 2)
-gamma = u0 * W / ((-a * Pe) * (tau - 0.5))
+gamma = u0 * H / ((-a * Pe) * (tau - 0.5))
 x = sympy.symbols('x')
 print("u0:{}".format(u0))
+print("C_t:{}".format(C_t))
+print("R_u0:{}".format(Ca * R_sigma / Eta))
+print("Ca:{}".format(u0 * Eta_n / sigma))
+print("Re:{}".format(u0 * 20 / Eta_n))
+Re = u0 * 20 / Eta_n
 
 
 class Compute:
@@ -81,9 +92,8 @@ class Compute:
                 self.w[i] = 1 / 36
                 self.e[i][0] = 1
                 self.e[i][1] = -1
-            print(self.e[i], self.w[i])
         self.psi = np.full((H, W), -1.0)
-        self.psi[:, :10] = 1.0
+        self.psi[:, :5] = 1.0
         self.block_mask = np.logical_not(mask)
         self.psi[self.block_mask] = psi_wall
         self.left_wall = np.full((H, 1), 1.0)
@@ -93,7 +103,8 @@ class Compute:
         self.nabla_psix = np.zeros((H, W))
         self.nabla_psiy = np.zeros((H, W))
         self.nabla_psi2 = np.zeros((H, W))
-        self.rho = np.ones((H, W))[mask] * rho0  # macroscopic density
+        my_number = np.random.randint(0, 1, size=(H, W)) * 2 - 1.0
+        self.rho = np.ones((H, W))[mask] + np.random.rand(H, W)[mask] * 0.001 * my_number[mask]  # macroscopic density
         self.ux = np.zeros((H, W))[mask]
         self.uy = np.zeros((H, W))[mask]
         self.p = np.zeros((H, W))[mask]
@@ -107,9 +118,9 @@ class Compute:
         self.nabla_psix = self.getNabla_psix()
         self.nabla_psiy = self.getNabla_psiy()
         self.nabla_psi2 = self.getNabla_psi2()
-        mu = self.getMu()
-        # self.uy = self.getUy()
         self.p = self.getP()
+        self.mu = self.getMu()
+        self.uy = self.getUy()
         self.mix_tau = self.getMix_tau()
         for i in range(9):
             self.f[i][self.mask] = self.getfeq(i)
@@ -296,7 +307,8 @@ class Compute:
                                                                                                           :, 0])
         for i in range(9):
             if i == 1:
-                self.f[i][1:-1, 0] = self.f[3][1:-1, 0] + 1.5 * ux * rho_inlet[1:-1] - psi_x[1:-1, 0] * mu[1:-1, 0] / 6
+                self.f[i][1:-1, 0] = self.f[3][1:-1, 0] + (2 / 3) * ux * rho_inlet[1:-1] - psi_x[1:-1, 0] * mu[1:-1,
+                                                                                                            0] / 6
                 self.g[i][1:-1, 0] = self.w[i] * psi_in[1:-1] / (self.w[1] + self.w[5] + self.w[8])
             if i == 5:
                 self.f[i][1:-1, 0] = self.f[7][1:-1, 0] - 0.5 * (
@@ -412,7 +424,9 @@ def update(i, x, y, cc):
     plt.cla()
     plt.pcolor(x, y, cc[i], label='MAX_T{}_Pe{}_M{}_Ca{}_wall{}'.format(MAX_T, Pe, M, Ca, psi_wall), cmap='RdBu')
     # plt.clim(0,1)
-    plt.legend()
+
+
+# plt.legend()
 
 
 def bottom_top_wall(f_behind, g_behind, f, g):
@@ -463,17 +477,14 @@ def main():
     # block_psi_all, corner_list = setblock(rect_corner_list)
     cr = Createblock(H, W)
     bb = Bounce_back(H, W)
-    circle_list = [[(int(W / 2 - W / 3), int(H / 2)), 30]]
-    circle_list = []
+    # circle_list = []
     # circle_list.append(((int(W/2), int(H/2)), 30))
-    #r = 13
-    xx = 78
+    # r = 13
     # circle_list.append(((count * 2 * r, xx + r), r))
     # circle_list.append(((count * 2 * r, 2 * xx + 3 * r), r))
     # circle_list.append(((count * 2 * r, 3 * xx + 5 * r + 1),  r + 1))
     # circle_list.append(((count * 2 * r, 3 * xx + 5 * r), r))
-    #count = 2
-    flag = True
+    # count = 2
     # while True:
     #     if count * 2 * r > 370:
     #         break
@@ -493,21 +504,53 @@ def main():
     #         circle_list.append(((count * 2 * r, 3 * xx + 5 * r), r + 5))
     #         flag = True
     #         count += 2
-    ellipse_list = []
-    mabiki = MAX_T // 150
-    count = 3
-    r = 20
+    # ellipse_list = []
+    mabiki = MAX_T // 100
+    # circle_list = []
+    # r = 10
+    # xx = 10
+    # count = 3
+    flag = True
     # while True:
-    #     if count * r > 380:
-    #         break
-    #     circle_list.append(((count * r, 2 * r), r))
-    #     circle_list.append(((count * r, 6 * r), r))
-    #     circle_list.append(((count * r, 10 * r), r))
-    #     circle_list.append(((count * r, 14 * r), r))
-    #     circle_list.append(((count * r, 18 * r), r))
-    #     count += 4
+    #    if count * (xx + r) > 380:
+    #        break
+    #    for i in range(block_num):
+    #        circle_list.append(((count * (r + xx), (2 * i + 1) * (r + xx)), r))
+    #    count += 2
 
-    block_psi_all, side_list, concave_list, convex_list = cr.setEllipseblock(ellipse_list)
+    # while True:
+    #    if count * (xx + r) > 380:
+    #        break
+    #    if flag:
+    #        for i in range(block_num):
+    #            circle_list.append(((count * (r + xx), (2 * i + 1) * (r + xx)), r))
+    #        count += 2
+    #        flag = False
+    #    else:
+    #        for i in range(block_num - 1):
+    #            circle_list.append(((count * (r + xx), (2 * i + 2) * (r + xx)), r))
+    #        count += 2
+    #        flag = True
+    count = 1
+    while True:
+        if (count + 1) * 20 > 380:
+            break
+        if flag:
+            for i in range(4):
+                rect_corner_list.append(
+                    ((count * 20, 60 * (i + 1) + i * 20), ((count + 1) * 20, 60 * (i + 1) + (i + 1) * 20)))
+            flag = False
+            count += 2
+            continue
+        else:
+            for i in range(5):
+                rect_corner_list.append(
+                    ((count * 20, 60 * i + (i + 1) * 20), ((count + 1) * 20, 60 * i + (i + 2) * 20)))
+            flag = True
+            count += 2
+    block_psi_all, corner_list = cr.setblock(rect_corner_list)
+
+    # block_psi_all, side_list, concave_list, convex_list = cr.setCirleblock(circle_list)
     block_mask = np.where(block_psi_all == 1, True, False)
     mask = np.logical_not(block_mask)
     cm = Compute(mask)
@@ -519,14 +562,14 @@ def main():
             cm.geq[j] = cm.getgeq(j)
             cm.f[j][mask] = cm.getF(j)
             cm.g[j][mask] = cm.getG(j)
-        #if i % mabiki == 0:
-         #   cc = np.append(cc, np.array([cm.psi]), axis=0)
+        if i % mabiki == 0:
+            cc = np.append(cc, np.array([cm.psi]), axis=0)
         print("timestep:{}".format(i))
         f_behind = copy.deepcopy(cm.f)
         g_behind = copy.deepcopy(cm.g)
         stream(cm.f, cm.g)
-        bb.halfway_bounceback_circle(side_list, concave_list, convex_list, f_behind, g_behind, cm.f, cm.g)
-        # halfway_bounceback(corner_list, f_behind, g_behind, cm.f, cm.g)
+        # bb.halfway_bounceback_circle(side_list, concave_list, convex_list, f_behind, g_behind, cm.f, cm.g)
+        bb.halfway_bounceback_rec(corner_list, f_behind, g_behind, cm.f, cm.g)
         bottom_top_wall(f_behind[:, 1:-1], g_behind[:, 1:-1], cm.f[:, 1:-1], cm.g[:, 1:-1])
         cm.zou_he_boundary_inlet()
         cm.zou_he_boundary_outlet()
@@ -545,16 +588,14 @@ def main():
     # fig = plt.figure()
     # plt.colorbar(plt.pcolor(x, y, cc[0], cmap='RdBu'))
     # ani = animation.FuncAnimation(fig, update, fargs=(x, y, cc), frames=int(len(cc)))
-    # ani.save('../movies/MAX_T{}_Pe{}_M{}_Ca{}_wall{}.mp4'.format(MAX_T, Pe, M, Ca, psi_wall), fps=10)
+    # ani.save('../movies/bbc_b_num{}_Pe{}_M{}_Ca{:.4f}_wall{}_Re{:.2f}_sigma{}_tau{}_Eta{}.mp4'.format(block_num, Pe, M, Ca, psi_wall, Re, R_sigma, tau, Eta), fps=10)
     plt.figure()
-    plt.pcolor(x, y, cm.psi, label='MAX_T{}_Pe{}_M{}_Ca{}_wall{}'.format(MAX_T, Pe, M, Ca, psi_wall), cmap='RdBu')
+    plt.pcolor(x, y, cm.psi, cmap='RdBu')
     plt.colorbar()
-    plt.legend()
-    # plt.xticks(np.arange(0, 100, 5))
-    # plt.yticks(np.arange(0, 100, 5))
+    # plt.legend()
     # plt.grid()
     plt.show()
-    # plt.savefig('../images/MAX_T{}_Pe{}_M{}_Ca{}_wall{}.png'.format(MAX_T, Pe, M, Ca, psi_wall))
+    # plt.savefig('../images/bbc_b_num{}_Pe{}_M{}_Ca{:.4f}_wall{}_Re{:.2f}_sigma{}_tau{}_Eta{}.png'.format(block_num, Pe, M, Ca, psi_wall, Re, R_sigma, tau, Eta))
 
 
 if __name__ == '__main__':
@@ -564,22 +605,7 @@ if __name__ == '__main__':
         main()
         t2 = time.time()
         print((t2 - t1) / 60)
-        # H = 30
-        # W = 30
-        # cr = Createblock()
-        # setCirleblock([[(15, 15), 10]])
-        # y = [i for i in range(H)]
-        # x = [i for i in range(W)]
-        # block = cr.getCicleblock((15, 15), 10)
-        # plt.figure()
-        # plt.pcolor(x, y, block)
-        # plt.grid()
-        # plt.show()
-        # upload_file_2 = drive.CreateFile()
-        # upload_file_2.SetContentFile('MAX_T{}_Pe{}_M{}_Ca{}_wall{}.mp4'.format(MAX_T, Pe, M, Ca, psi_wall))
-        # upload_file_2.Upload()
-        # upload_file_1 = drive.CreateFile()
-        # upload_file_1.SetContentFile('MAX_T:{}_Pe:{}_M:{}_Ca{}_psi_wall:{}.png'.format(MAX_T, Pe, M,Ca, psi_wall))
-        # upload_file_1.Upload()
+        # subprocess.call(["gdrive upload ../movies/bbc_b_num{}_Pe{}_M{}_Ca{:.4f}_wall{}_Re{:.2f}_sigma{}_tau{}_Eta{}.mp4".format(block_num, Pe, M, Ca, psi_wall, Re, R_sigma, tau, Eta)], shell=True)
+        # subprocess.call(["gdrive upload ../images/bbc_b_num{}_Pe{}_M{}_Ca{:.4f}_wall{}_Re{:.2f}_sigma{}_tau{}_Eta{}.png".format(block_num, Pe, M, Ca, psi_wall, Re, R_sigma, tau, Eta)], shell=True)
     except Warning as e:
         print(e)

@@ -8,6 +8,8 @@ class Bounce_back:
         self.W = W
 
     """https://www.math.nyu.edu/~billbao/report930.pdf"""
+
+    # 左辺のhole部分のみ境界条件を変えるとき
     def left_boundary(self, f_behind, g_behind, f, g, hole):
         mask = np.zeros((self.H, self.W), dtype=bool)
         mask[:int(self.H / 2 - hole), 0] = True
@@ -19,8 +21,7 @@ class Bounce_back:
         f[8][mask] = copy.deepcopy(f_behind[6][mask])
         g[8][mask] = copy.deepcopy(g_behind[6][mask])
 
-        # mid-grid halfway bounce back
-
+    # 長方形の境界条件
     def halfway_bounceback_rec(self, corner_list, f_behind, g_behind, f, g):
         self.H = f[0].shape[0]
         self.W = f[0].shape[1]
@@ -33,7 +34,6 @@ class Bounce_back:
         sw_corner = np.zeros((self.H, self.W), dtype=bool)
         se_corner = np.zeros((self.H, self.W), dtype=bool)
         for cor in corner_list:
-            # print(cor['top_left'], cor['top_right'], cor['bottom_right'], cor['bottom_left'])
             n_barrier[cor['top_left'][1] + 1, cor['top_left'][0]:cor['top_right'][0] + 1] = True
             s_barrier[cor['bottom_left'][1] - 1, cor['top_left'][0]:cor['top_right'][0] + 1] = True
             w_barrier[cor['bottom_left'][1]:cor['top_left'][1] + 1, cor['top_left'][0] - 1] = True
@@ -42,7 +42,6 @@ class Bounce_back:
             ne_corner[cor['top_left'][1] + 1, cor['top_right'][0] + 1] = True
             sw_corner[cor['bottom_left'][1] - 1, cor['bottom_left'][0] - 1] = True
             se_corner[cor['bottom_left'][1] - 1, cor['bottom_right'][0] + 1] = True
-            # print(cor['top_left'], cor['top_right'], cor['bottom_left'], cor['bottom_right'])
 
         for i in range(9):
             if i == 1:
@@ -86,7 +85,7 @@ class Bounce_back:
                 f[i][e_barrier] = f_behind[6][e_barrier]
                 g[i][e_barrier] = g_behind[6][e_barrier]
 
-    # mid-grid halfway bounce back
+    # 円と楕円用の境界条件
     def halfway_bounceback_circle(self, side_list, concave_list, convex_list, f_behind, g_behind, f, g):
         n_barrier = side_list[0]
         s_barrier = side_list[1]
