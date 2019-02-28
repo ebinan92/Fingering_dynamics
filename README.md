@@ -14,7 +14,7 @@ two phase lattice boltzmann with zou-he boundary and half way bounce-back
     │   ├── main_3phase.py           # three phase precipitation viscous fingering (https://journals.aps.org/pre/abstract/10.1103/PhysRevE.93.023103)
     │   
     
-./lattice_boltzmann/fingering.py
+./lattice_boltzmann/fingering_periodic.py
 
 ![](fingering_periodic.gif)
 
